@@ -28,7 +28,7 @@ import util
 
 
 halite_command = "./halite"
-visualizer_command = ["electron", "../visualizer", "-o"]
+visualizer_command = ["electron", "../fluorine"]
 # db_filename is now specified at command line, with the default set to "db.sqlite3"
 browser_binary = "firefox"
 

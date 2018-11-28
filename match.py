@@ -8,6 +8,7 @@ from skills import trueskill
 from subprocess import Popen, PIPE, call
 
 record_dir = "replays"
+error_dir = "error_replays"
 
 def update_skills(players, ranks):
     """ Update player skills based on ranks from a match """
@@ -47,6 +48,7 @@ class Match:
         self.parameters = None
         self.logs = None
         self.map_generator = None
+        self.bots_terminated = None
 
     def __repr__(self):
         title1 = "Match between " + ", ".join([p.name for p in self.players]) + "\n"
@@ -78,7 +80,11 @@ class Match:
             print("Keeping replay\n")
             if not os.path.exists(record_dir):
                 os.makedirs(record_dir)
+            if not os.path.exists(error_dir):
+                os.makedirs(error_dir)
             try:
+                if self.bots_terminated:
+                    shutil.copy(self.replay_file, error_dir)
                 shutil.move(self.replay_file, record_dir)
                 if self.replay_file.startswith('./'):
                     self.replay_file = self.replay_file[2:]
@@ -93,8 +99,12 @@ class Match:
             print("Keeping logs\n")
             if not os.path.exists(record_dir):
                 os.makedirs(record_dir)
+            if not os.path.exists(error_dir):
+                os.makedirs(error_dir)
             try:
                 for key, filename in self.logs.items():
+                    if (self.bots_terminated != None):
+                        shutil.copy(filename, error_dir)
                     shutil.move(filename, record_dir)
                     self.logs[key] = os.path.join(record_dir, filename)
             except Exception as e:
@@ -129,6 +139,7 @@ class Match:
         print ("parsing results g")
         self.replay_file = data['replay']
         print ("parsing results h")
+        self.bots_terminated = data['terminated']
         stats = data['stats']
         print ("parsing results i")
         for player_index_string in stats:
