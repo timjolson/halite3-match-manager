@@ -1,5 +1,5 @@
 #!/bin/bash
-for bot in bots/*
+for bot in bots/mybot*
 do
   if [ -f $bot ]
   then

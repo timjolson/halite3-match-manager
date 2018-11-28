@@ -70,16 +70,29 @@ class Manager:
             print("Saving player %s with %f skill" % (player.name, player.skill))
             self.db.save_player(player)
 
+    def highest_relevant_sigma_index(self):
+        index = -1
+        count = 0
+        highest = 0
+        for player in self.players:
+            if player.sigma > highest and player.ngames < 1024:
+                index = count
+                highest = player.sigma
+            count = count + 1
+        return index
+
     def pick_contestants(self, num):
         pool = list(self.players)   #this makes a copy
         contestants = list()
         # FIXME maybe reactivate this block later
-#        if self.priority_sigma:
-#            high_sigma_index = max((player.sigma, i) for i, player in enumerate(self.players))[1]
-#            high_sigma_contestant = self.players[high_sigma_index]
-#            contestants.append(high_sigma_contestant)
-#            pool.remove(high_sigma_contestant)
-#            num -= 1
+        if self.priority_sigma:
+            #high_sigma_index = max((player.sigma, i) for i, player in enumerate(self.players))[1]
+            high_sigma_index = self.highest_relevant_sigma_index()
+            if (high_sigma_index >= 0):
+                high_sigma_contestant = self.players[high_sigma_index]
+                contestants.append(high_sigma_contestant)
+                pool.remove(high_sigma_contestant)
+                num -= 1
         random.shuffle(pool)
         contestants.extend(pool[:num])
         random.shuffle(contestants)
