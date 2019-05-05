@@ -27,7 +27,7 @@ def update_skills(players, ranks):
         logging.debug("skill = %4f  mu = %3f  sigma = %3f  name = %s" % (player.skill, player.mu, player.sigma, str(player_name)))
 
 class Match:
-    def __init__(self, players, width, height, seed, turn_limit, keep_replays, keep_logs, no_timeout, record_dir='replays'):
+    def __init__(self, players, width, height, seed, turn_limit, keep_replays, keep_logs, no_timeout, record_dir, halite_binary):
         self.map_seed = seed
         self.map_height = height
         self.map_width = width
@@ -39,6 +39,7 @@ class Match:
         self.results_string = ""
         self.replay_file = ""
         self.record_dir = record_dir
+        self.halite_binary = halite_binary
         self.turn_limit = turn_limit
         self.total_time_limit = 60*5.0  # 5 minutes
         self.timeouts = []
@@ -58,8 +59,8 @@ class Match:
         replay = self.replay_file + "\n"
         return title1 + title2 + dims + results + replay
 
-    def get_command(self, halite_binary):
-        result = [halite_binary]
+    def get_command(self):
+        result = [self.halite_binary]
         result.append("--height " + str(self.map_height))
         result.append("--width " + str(self.map_width))
         result.append('' if not self.turn_limit else ("--turn-limit " + str(self.turn_limit)))
@@ -73,8 +74,8 @@ class Match:
 
         return [r for r in result if r] + self.paths
 
-    def run_match(self, halite_binary):
-        command = self.get_command(halite_binary)
+    def run_match(self):
+        command = self.get_command()
         logging.debug("Command = " + str(command))
         p = Popen(command, stdin=None, stdout=PIPE, stderr=None)
         results, _ = p.communicate(None, self.total_time_limit)
