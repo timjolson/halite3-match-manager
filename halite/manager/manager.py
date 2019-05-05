@@ -60,7 +60,7 @@ class Manager:
             self.halite_binary = ''
             self.visualizer_cmd = []
 
-        self.logger.debug('Using database %s' % db_filename)
+        self.logger.warning('Using database %s' % db_filename)
 
     def refresh_db(self, db_filename=None):
         if db_filename:
@@ -89,7 +89,7 @@ class Manager:
         self.db.set_replay_directory(dir)
 
     def activate_all(self):
-        self.logger.debug("Activating all players...")
+        self.logger.warning("Activating all players...")
  #       for player in self.get_all_players():
  #           self.db.activate_player(player.name)
         player_records = self.db.retrieve("select * from players")
@@ -98,7 +98,7 @@ class Manager:
         self.refresh_db()
 
     def deactivate_all(self):
-        self.logger.debug("Deactivating all players...")
+        self.logger.warning("Deactivating all players...")
         self.db.update_many("update players set active=? where name=?", [(0, p.name) for p in self.get_all_players()])
         self.refresh_db()
 
@@ -137,7 +137,7 @@ class Manager:
             self.db.save_player(player)
 
     def pick_contestants(self, num, force=None):
-        self.logger.debug(f"picking {num} contestants")
+        self.logger.debug(f"Picking {num} contestants")
 
         pool = list(self.get_all_players())
         contestants = list()
@@ -150,7 +150,7 @@ class Manager:
         if force is None:
             force = self.bot
         if force:
-            self.logger.debug(f"forcing {force} to play")
+            self.logger.info(f"Forcing {force} to play")
             force = self.get_player(force)
             pool.remove(force)
             num -= 1
@@ -198,7 +198,7 @@ class Manager:
 
         if nrounds >= 0:
             with keyboard_detection() as key_pressed:
-                pbar = tqdm(range(nrounds), leave=False, desc=f'Rounds')
+                pbar = tqdm(range(nrounds), leave=False, desc=f'Rounds', ncols=80)
                 stopped = False
                 for _ in range(nrounds):
                     if key_pressed():
@@ -251,7 +251,7 @@ class Manager:
         :param seed: map seed
         :return: Match object
         '''
-        self.logger.debug("\n------------------- running new match... -------------------\n")
+        self.logger.info("\n------------------- Running new match... -------------------\n")
         m = match.Match(contestants, width, height, seed, self.turn_limit, self.keep_replays,
                         self.keep_logs, self.no_timeout, self.record_dir, self.halite_binary)
         cont_str = '\n'.join([str(c) for c in contestants])
@@ -309,6 +309,7 @@ class Manager:
 
     def show_results(self, offset, limit):
         results = self.db.get_results(offset, limit)
+        self.logger.info("Match\tBots\t\tPlace/Halite\t\tW   H\tSeed\t\tTime\t\tReplay File")
         for result in results:
             self.logger.info(result)
 
@@ -324,12 +325,15 @@ class Manager:
 
     def view_replay(self, filename):
         cmd = []
+        valid = False
         for idx, value in enumerate(self.visualizer_cmd):
             if value.upper() == "FILENAME":
                 cmd.append(filename)
+                valid = True
             else:
                 cmd.append(value)
-        if cmd:
+        if cmd and valid:
+            logging.debug(f"Vis command = \"{cmd}\"")
             subprocess.Popen(cmd)
         else:
             raise ValueError(f"Visualizer command '{self.visualizer_cmd}' invalid.")

@@ -141,7 +141,7 @@ class Commandline:
                                  help = "View results starting from offset")
 
         self.parser.add_argument("-L", "--limit", dest="limit",
-                                 action = "store", default = "25",
+                                 action = "store", default = "10",
                                  help = "Limit number of displayed results")
 
         ##########
@@ -205,7 +205,7 @@ class Commandline:
             self.manager.run_rounds(rounds, self.cmds.player_dist, self.cmds.map_dist)
 
     def act(self):
-        verbosity = (logging.ERROR - self.cmds.verbosity * logging.DEBUG)
+        verbosity = (logging.ERROR - self.cmds.verbosity * 10)
         """
         logging.CRITICAL = 50
         logging.FATAL = 50
@@ -215,9 +215,6 @@ class Commandline:
         logging.DEBUG = 10
         logging.NOTSET = 0
         """
-        # self.logger.basicConfig(stream=sys.stdout, level=verbosity, format='%(message)s')
-        # self.logger.debug('Using database %s' % self.cmds.db_filename)
-
         self.manager = Manager(self.cmds.db_filename, verbosity)
         self.manager.logger.addHandler(logging.StreamHandler(sys.stdout))
 
@@ -246,11 +243,9 @@ class Commandline:
 
         if self.cmds.reset:
             self.manager.logger.error('You want to reset the database.  This is IRRECOVERABLE.  Make a backup first.')
-            self.manager.logger.error('The existing bots names, paths, and activation status will be saved.')
-            self.manager.logger.error('Then, the database will be DELETED.')
-            self.manager.logger.error('A new, empty database will be created in its place using the same filename.')
-            self.manager.logger.error('Finally, the saved bots will be added as new bots (ie names, paths and activation statuses only) in the new database.')
-            ok = input('Continue?: ')
+            self.manager.logger.error('This is equivalent to resetting every bot in the database.')
+            self.manager.logger.error('Again, this CANNOT BE UNDONE.')
+            ok = input('Continue? (y): ')
             if ok.lower() in ['y', 'yes']:
                 self.manager.db.reset(self.cmds.db_filename)
                 self.manager.logger.error('Database reset completed.')
@@ -363,15 +358,20 @@ class Commandline:
             self.run_matches(1)
         elif self.cmds.matches:
             n = self.cmds.matches
-            self.manager.logger.error(f"Running {n} matches, or until interrupted. Press <q> or <ESC> key to exit safely.")
-            level = self.manager.logger.getEffectiveLevel()
-            self.manager.logger.setLevel(logging.ERROR)
-            try:
-                self.manager.run_supervised_rounds(n)
-            except KeyStop:
-                self.manager.logger.error("Matches were interrupted.")
-            self.manager.logger.setLevel(level)
-            self.cmds.showRanks=True
+            if n > 0:
+                self.manager.logger.error(
+                    f"Running {n} matches, or until interrupted. Press <q> or <ESC> key to exit safely.")
+                level = self.manager.logger.getEffectiveLevel()
+                self.manager.logger.setLevel(logging.ERROR)
+                try:
+                    self.manager.run_supervised_rounds(n)
+                except KeyStop:
+                    self.manager.logger.error("Matches were interrupted.")
+                self.manager.logger.setLevel(level)
+                self.cmds.showRanks=True
+            else:
+                self.manager.logger.error(
+                    f"Usage Error: '{n}' is not a valid number of matches.")
         elif self.cmds.forever:
             self.manager.logger.error("Running matches until interrupted. Press <q> or <ESC> key to exit safely.")
             self.run_matches(-1)

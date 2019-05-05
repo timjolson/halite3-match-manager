@@ -92,7 +92,7 @@ class Database:
             id = game_id
         sql = 'SELECT replay_file FROM results WHERE game_id = ?'
         result = self.retrieve(sql, (id,))
-        logging.debug(f"Database.get_replay_filename({ID}={id}): {result[0][0]}")
+        logging.debug(f"Database.get_replay_filename({ID}=>{id}): '{result[0][0]}'")
         return id, result[0][0]
 
     def save_player(self, player):

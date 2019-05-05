@@ -1,32 +1,16 @@
 Halite III Match Manager
 -----------------------
-This is a small Python script which can run many games between local bots, producing ranking data which is stored in an sqlite3 database.
+This is a Python package which can run many games between local bots, producing ranking data which is stored in an sqlite3 database.
 
 This was adapted from the Halite II match manager. Some bugs and legacy code may remain.
 
-It requires the 'skills' module which can be installed through Pip:
-
-https://pypi.python.org/pypi/skills
 
 Usage
 -----
 
-Full command line arguments can by displayed by running "manager.py" with no arguments. Examples of Bash command line invocation are shown below.
+Command line script "halite3-match-manager/manager.py" provides an easy access interface.
 
-
-To configure Manager options, saved to database:
-```
-    # halite executable
-    ./manager.py --halite '../path/to/halite.exe'  # halite executable
-    
-    # replay directory
-    ./manager.py --replay_dir '../storage/replays'
-    
-    # visualizer command
-    # FILENAME gets replaced at runtime for each usage
-    # this example runs "vis.exe opt1 FILENAME opt2"
-    ./manager.py --visalizer "['vis.exe', 'opt1', 'FILENAME', 'opt2']"
-```
+Examples of Bash command line invocation are shown below.
 
 To add a bot:
 ```
@@ -56,9 +40,10 @@ To show results:
 ```
     ./manager.py -r         # display bot rank table
     
-    ./manager.py -R 0       # show last 25 games
+    ./manager.py -R 0       # show last 10 games
     ./manager.py -R 0 -L 5  # show last 5 games
-    ./manager.py -R 10      # show 25 games up to 10th to last played
+    ./manager.py -R 10      # show 10 games up to 10th to last played
+    ./manager.py -R 10 -L 5 # show 5 games up to 10th to last played
 ```
 
 To visualize match:
@@ -104,4 +89,46 @@ Clear *.log and replay files (in ./ and in replay directory set in manager.py):
     --reset  # builds new database (no records), keeping bots and options
 ```
 
-The visualizer must be set up separately. The command used to visualize replays is specified at the top of manager.py.
+
+Installation
+-----
+
+See recommended setup and configuration [unix script](https://gitlab.com/timjolson/halite3-match-manager/blob/master/recommended_setup.sh)
+
+#### Manager Package
+    git clone https://gitlab.com/timjolson/halite3-match-manager
+    pip install -e halite3-match-manager
+
+#### Visualizer (fluorine example)
+    ## Install npm : https://www.npmjs.com/get-npm
+    apt install npm
+
+    ## Install electron to run locally or gobally
+    ## This may take a while
+    npm install electron     # Local
+    npm install -g electron  # Global
+
+    ## Install fluorine
+    git clone https://github.com/fohristiwhirl/fluorine
+    cd fluorine
+    npm install
+    
+    ## Run fluorine on a replay file
+    # Local electron install
+    ./node_modules/.bin/electron . -o replay_file.hlt
+    
+    # Global electron install
+    electron . -o replay_file.hlt
+
+### Configure Manager options (saved in database file):
+
+    # halite executable
+    ./manager.py --halite '../path/to/halite.exe'
+    
+    # replay directory
+    ./manager.py --replay_dir '../path/to/replays'
+    
+    # visualizer command
+    # FILENAME gets replaced at runtime for each usage
+    # this example runs command "vis.exe opt1 FILENAME opt2"
+    ./manager.py --visalizer "['vis.exe', 'opt1', 'FILENAME', 'opt2']"
