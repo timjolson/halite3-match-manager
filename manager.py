@@ -186,6 +186,10 @@ class Commandline:
                                  action = "store", default = None,
                                  help="Specify the halite command string with: '../halite/halite.exe'")
 
+        self.parser.add_argument('--config', dest='config',
+                                 action = "store_true", default = False,
+                                 help="View the databases configuration.")
+
     def parse(self, args):
         self.no_args = not args
         self.cmds = self.parser.parse_args(args)
@@ -229,6 +233,10 @@ class Commandline:
                 os.remove(fl)
             for fl in glob.glob(os.path.join(os.getcwd(), "*.log")):
                 os.remove(fl)
+
+        if self.cmds.config:
+            _, replays, halite, vis = self.manager.db.get_options()[0]
+            self.manager.logger.error(f"Replay directory: '{replays}'\nHalite comand: '{halite}'\nVisualizer command: '{vis}'")
 
         if self.cmds.halite:
             self.manager.set_halite_cmd(self.cmds.halite)
@@ -396,7 +404,8 @@ class Commandline:
         if self.cmds.view is not None:
             self.cmds.view = int(self.cmds.view)
             id, filename = self.manager.get_replay_filename(self.cmds.view)
-            self.manager.view_replay(filename)
+            if filename:            
+                self.manager.view_replay(filename)
             if filename:
                 self.manager.logger.error(f"Viewing replay for Match {id} :: {filename}")
 

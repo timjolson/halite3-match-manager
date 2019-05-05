@@ -117,14 +117,14 @@ class Manager:
             self.save_players(match.players)
             self.db.update_player_ranks()
             id, filename = self.db.get_replay_filename(0)
-            logging.warning(f"\nMatch ID: {id} --- Seed: {match.map_seed} --- Size: {match.map_width}x{match.map_height}\nReplay file: {filename}")
+            self.logger.warning(f"\nMatch ID: {id} --- Seed: {match.map_seed} --- Size: {match.map_width}x{match.map_height}\nReplay file: {filename}")
 
             result = ''
             for pid, res in enumerate(match.results):
                 name = match.players[pid].name
                 rank, score = eval(res)
                 result += f"{name:<16}:: Rank: {rank}  Score: {score}\n"
-            logging.warning(result)
+            self.logger.warning(result)
 
         else:
             msg = f"A bot was terminated: {match.terminated} \n{match.players}"
@@ -333,7 +333,7 @@ class Manager:
             else:
                 cmd.append(value)
         if cmd and valid:
-            logging.debug(f"Vis command = \"{cmd}\"")
+            self.logger.debug(f"Vis command = \"{cmd}\"")
             subprocess.Popen(cmd)
         else:
             raise ValueError(f"Visualizer command '{self.visualizer_cmd}' invalid.")

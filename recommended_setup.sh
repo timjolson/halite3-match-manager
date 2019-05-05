@@ -16,7 +16,7 @@ npm install --verbose electron
 # Install fluorine
 git clone https://github.com/fohristiwhirl/fluorine
 cd fluorine
-npm install
+npm install --verbose
 cd ..
 
 mkdir replays
