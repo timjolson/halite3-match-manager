@@ -97,7 +97,7 @@ See recommended setup and configuration [unix script](https://gitlab.com/timjols
 
 #### Manager Package
     git clone https://gitlab.com/timjolson/halite3-match-manager
-    pip install -e halite3-match-manager
+    pip3 install -e halite3-match-manager
 
 #### Visualizer (fluorine example)
     ## Install npm : https://www.npmjs.com/get-npm
@@ -112,13 +112,14 @@ See recommended setup and configuration [unix script](https://gitlab.com/timjols
     git clone https://github.com/fohristiwhirl/fluorine
     cd fluorine
     npm install
+    cd ..
     
     ## Run fluorine on a replay file
     # Local electron install
-    ./node_modules/.bin/electron . -o replay_file.hlt
+    ./node_modules/.bin/electron ./fluorine -o replay_file.hlt
     
     # Global electron install
-    electron . -o replay_file.hlt
+    electron ./fluorine -o replay_file.hlt
 
 ### Configure Manager options (saved in database file):
 
