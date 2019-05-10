@@ -12,7 +12,7 @@ class Player:
 
     def __repr__(self):
         #return "{:<20}{:<20}{:^6}{:10.4f}{:10.4f}{:10.4f}   {:>5} {:>5}        {:<30}".format(self.name, str(self.last_seen), self.rank, self.skill, self.mu, self.sigma, self.ngames, self.active, self.path)
-        return "{:<20}{:<20}{:^6}{:10.4f}{:10.4f}{:10.4f}   {:>5} {:>5}".format(self.name, str(self.last_seen), self.rank, self.skill, self.mu, self.sigma, self.ngames, self.active)
+        return self._column_format().format(self.name, str(self.last_seen), self.rank, self.skill, self.mu, self.sigma, self.ngames, self.active)
 
     def update_skill(self):
         self.skill = self.mu - (self.sigma * 3)
@@ -21,10 +21,18 @@ class Player:
     def __eq__(self, other):
         return self.name == other.name
 
-    @staticmethod
-    def get_columns():
-        return "{:<20}{:<20}{:^6}  {:^10}{:^10}{:^10}{:^8}{:^8}".format("name", "last_seen", "rank", "skill", "mu",
+    @classmethod
+    def get_columns(cls):
+        return cls._header_format().format("name", "last_seen", "rank", "skill", "mu",
                                                                      "sigma", "ngames", "active")
+
+    @staticmethod
+    def _column_format():
+        return "{:<11}{:<20}{:^6}{:8.3f}{:8.3f}{:8.3f}{:>6}{:>8}"
+
+    @staticmethod
+    def _header_format():
+        return "{:<11}{:<20}{:^7}{:^10}{:^5}{:^10} {:^7}{:^8}"
 
     @staticmethod
     def parse_player_record(player):

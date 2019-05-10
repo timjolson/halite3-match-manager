@@ -21,21 +21,11 @@ from halite.manager import Manager
 from halite.utils import KeyStop
 
 # folders
-# filefolder = os.path.abspath('./halite/manager/')
-# managerfolder = os.path.abspath(os.path.dirname(os.path.dirname(filefolder)))
 managerfolder = os.path.abspath(os.path.dirname(__file__))
 mainfolder = os.path.abspath(os.path.dirname(managerfolder))
 
-# halite binary
-halite_command = managerfolder+"/halite/manager/halite"
-
-# fluorine command
-visualizer_command = [mainfolder+"/fluorine/node_modules/.bin/electron", mainfolder+"/fluorine", "-o"]
-
 # default database
 db_filename = managerfolder+'/bots/db.sqlite3'
-
-record_dir = managerfolder+'/replays'
 
 
 class Commandline:
@@ -53,8 +43,8 @@ class Commandline:
         ##########
         # Bot handling
         self.parser.add_argument("-A", "--addBot", dest="addBot",
-                                 action = "store", default = "",
-                                 help = "Add a new bot with a name")
+                                 nargs=2, action = "store", default=[None],
+                                 help = "Add a new bot with: NAME 'PATH'")
 
         self.parser.add_argument("-D", "--deleteBot", dest="deleteBot",
                                  action = "store", default = "",
@@ -79,10 +69,6 @@ class Commandline:
         self.parser.add_argument("-b", "--bot", dest="playBot",
                                  action = "store", default = None,
                                  help = "Specify bot to play in every match")
-
-        self.parser.add_argument("-p", "--botPath", dest="botPath",
-                                 action = "store", default = "",
-                                 help = "Specify the path for a new bot")
 
         ##########
         # Halite options
@@ -124,13 +110,13 @@ class Commandline:
                                  action = "store_true", default = False,
                                  help = "Equal priority for all active bots (otherwise highest sigma will always be selected)")
 
-        self.parser.add_argument('-players', '--playerdist', '--player-dist', '--player_dist', dest='player_dist',
+        self.parser.add_argument('-p', '--players', dest='player_dist',
                                  nargs='*', action='store', default=None, type=int,
-                                 help='Specify a custom distribution of players per match')
+                                 help='Specify a custom distribution of players per match: {2,2,4}')
 
-        self.parser.add_argument('--mapdist', '--map-dist', '--map_dist', dest = 'map_dist', type = int,
+        self.parser.add_argument('--maps', dest = 'map_dist', type = int,
                                 nargs ='*', action = 'store', default=None,
-                                help = 'Specify a custom distribution of (square) map sizes.')
+                                help = 'Specify a custom distribution of (square) map sizes: {32,32,40,48}')
 
         ##########
         # Feedback
@@ -144,19 +130,19 @@ class Commandline:
 
         self.parser.add_argument("-F", "--viewfile", dest="viewfile",
                                  action = "store", default = "",
-                                 help = "View a replay")
+                                 help = "View a replay from a file")
 
         self.parser.add_argument("-V", "--view", dest="view",
                                  action = "store", default = None,
-                                 help = "View a replay from the saved records")
+                                 help = "View a replay from the replay_dir")
 
         self.parser.add_argument("-R", "--results", dest="results",
                                  action = "store", default = "",
                                  help = "View results starting from offset")
 
         self.parser.add_argument("-L", "--limit", dest="limit",
-                                 action = "store", default = "25",
-                                 help = "Limit number of results")
+                                 action = "store", default = "10",
+                                 help = "Limit number of displayed results")
 
         ##########
         # Log handling
@@ -178,25 +164,35 @@ class Commandline:
                                  help = 'Delete ALL information in the database, then recreate a new one with existing bot names and paths')
 
         self.parser.add_argument('-rb', dest="resetBot", action="store", default = None,
-                                 help = "Reset a bot's records")
+                                 help = "Reset a bot's record")
 
-        self.parser.add_argument('-db','--database', dest='db_filename',
+        self.parser.add_argument('-db', dest='db_filename',
                                  action = "store", default = db_filename,
                                  help = 'Specify the database filename')
 
         self.parser.add_argument('--edit', dest = 'editBot',
-                                 action = 'store', default = '',
-                                 help = 'Edit the path of the named bot')
+                                 nargs=2, action = 'store', default = [None],
+                                 help = "Edit the path of a bot with: NAME 'NEWPATH'")
+
+        self.parser.add_argument('--replay_dir', dest='replay_dir',
+                                 action = "store", default = None,
+                                 help = 'Specify the replay storage directory')
+
+        self.parser.add_argument('--visualizer', dest='visualizer',
+                                 action = "store", default = "",
+                                 help="Specify the visualizer command with: \"['vis.exe', 'opt1', 'FILENAME', 'opt2']\"")
+
+        self.parser.add_argument('--halite', dest='halite',
+                                 action = "store", default = None,
+                                 help="Specify the halite command string with: '../halite/halite.exe'")
+
+        self.parser.add_argument('--config', dest='config',
+                                 action = "store_true", default = False,
+                                 help="View the databases configuration.")
 
     def parse(self, args):
         self.no_args = not args
         self.cmds = self.parser.parse_args(args)
-
-    def add_bot(self, bot, path):
-        self.manager.add_player(bot, path)
-
-    def delete_bot(self, bot):
-        self.manager.delete_player(bot)
 
     def valid_botfile(self, path):
         return True
@@ -213,7 +209,7 @@ class Commandline:
             self.manager.run_rounds(rounds, self.cmds.player_dist, self.cmds.map_dist)
 
     def act(self):
-        verbosity = (logging.ERROR - self.cmds.verbosity * logging.DEBUG)
+        verbosity = (logging.ERROR - self.cmds.verbosity * 10)
         """
         logging.CRITICAL = 50
         logging.FATAL = 50
@@ -223,13 +219,12 @@ class Commandline:
         logging.DEBUG = 10
         logging.NOTSET = 0
         """
-        # self.logger.basicConfig(stream=sys.stdout, level=verbosity, format='%(message)s')
-        # self.logger.debug('Using database %s' % self.cmds.db_filename)
-
-        self.manager = Manager(halite_command, self.cmds.db_filename, record_dir, verbosity)
+        self.manager = Manager(self.cmds.db_filename, verbosity)
         self.manager.logger.addHandler(logging.StreamHandler(sys.stdout))
 
         if self.cmds.clear_old:
+            record_dir = self.manager.record_dir
+
             import glob
             self.manager.logger.error(f"Deleting replays (*.hlt) and logs (*.log) from:\n'{os.path.abspath(record_dir)}' and '{os.path.abspath(os.getcwd())}'")
             for fl in glob.glob(os.path.join(record_dir, "*.log")):
@@ -239,17 +234,26 @@ class Commandline:
             for fl in glob.glob(os.path.join(os.getcwd(), "*.log")):
                 os.remove(fl)
 
+        if self.cmds.config:
+            _, replays, halite, vis = self.manager.db.get_options()[0]
+            self.manager.logger.error(f"Replay directory: '{replays}'\nHalite comand: '{halite}'\nVisualizer command: '{vis}'")
+
+        if self.cmds.halite:
+            self.manager.set_halite_cmd(self.cmds.halite)
+        if self.cmds.visualizer:
+            self.manager.set_visualizer_cmd(self.cmds.visualizer)
+        if self.cmds.replay_dir:
+            self.manager.set_replay_dir(self.cmds.replay_dir)
+
         if self.cmds.viewfile:
             self.manager.logger.info("Viewing replay file %s" %(self.cmds.viewfile))
-            self.manager.view_replay(visualizer_command, self.cmds.viewfile)
+            self.manager.view_replay(self.cmds.viewfile)
 
         if self.cmds.reset:
             self.manager.logger.error('You want to reset the database.  This is IRRECOVERABLE.  Make a backup first.')
-            self.manager.logger.error('The existing bots names, paths, and activation status will be saved.')
-            self.manager.logger.error('Then, the database will be DELETED.')
-            self.manager.logger.error('A new, empty database will be created in its place using the same filename.')
-            self.manager.logger.error('Finally, the saved bots will be added as new bots (ie names, paths and activation statuses only) in the new database.')
-            ok = input('Continue?: ')
+            self.manager.logger.error('This is equivalent to resetting every bot in the database.')
+            self.manager.logger.error('Again, this CANNOT BE UNDONE.')
+            ok = input('Continue? (y): ')
             if ok.lower() in ['y', 'yes']:
                 self.manager.db.reset(self.cmds.db_filename)
                 self.manager.logger.error('Database reset completed.')
@@ -260,23 +264,25 @@ class Commandline:
             self.manager.logger.debug("priority_sigma = False")
             self.manager.priority_sigma = False
 
-        if self.cmds.addBot:
+        if self.cmds.addBot[0]:
             self.manager.logger.error("Adding new bot...")
-            if self.cmds.botPath == "":
-                self.manager.logger.error("You must specify the path for the new bot [-p BOTPATH]")
-            elif self.valid_botfile(self.cmds.botPath):
-                self.add_bot(self.cmds.addBot, self.cmds.botPath)
-        elif self.cmds.editBot:
-            if not self.cmds.botPath:
-                self.manager.logger.error("You must specify the new path for the bot [-p BOTPATH]")
-            elif self.valid_botfile(self.cmds.botPath):
-                self.manager.edit_path(self.cmds.editBot, self.cmds.botPath)
+            botPath = self.cmds.addBot[1]
+            if botPath == "":
+                self.manager.logger.error("You must specify the path for the new bot")
+            elif self.valid_botfile(botPath):
+                self.manager.add_player(self.cmds.addBot[0], botPath)
+        elif self.cmds.editBot[0]:
+            botPath = self.cmds.editBot[1]
+            if not botPath:
+                self.manager.logger.error("You must specify the new path for the bot")
+            elif self.valid_botfile(botPath):
+                self.manager.edit_path(self.cmds.editBot[0], botPath)
         elif self.cmds.deleteBot:
             bot = self.cmds.deleteBot
             self.manager.logger.error(f"You want to delete player '{bot}'.  This is IRRECOVERABLE.")
             ok = input('Continue?: ')
             if ok.lower() in ['y', 'yes']:
-                self.delete_bot(self.cmds.deleteBot)
+                self.manager.delete_player(self.cmds.deleteBot)
                 self.manager.logger.error(f"Bot '{bot}' deleted.")
             else:
                 self.manager.logger.error('Bot delete aborted. No changes made.')
@@ -360,15 +366,20 @@ class Commandline:
             self.run_matches(1)
         elif self.cmds.matches:
             n = self.cmds.matches
-            self.manager.logger.error(f"Running {n} matches, or until interrupted. Press <q> or <ESC> key to exit safely.")
-            level = self.manager.logger.getEffectiveLevel()
-            self.manager.logger.setLevel(logging.ERROR)
-            try:
-                self.manager.run_supervised_rounds(n)
-            except KeyStop:
-                self.manager.logger.error("Matches were interrupted.")
-            self.manager.logger.setLevel(level)
-            self.cmds.showRanks=True
+            if n > 0:
+                self.manager.logger.error(
+                    f"Running {n} matches, or until interrupted. Press <q> or <ESC> key to exit safely.")
+                level = self.manager.logger.getEffectiveLevel()
+                self.manager.logger.setLevel(logging.ERROR)
+                try:
+                    self.manager.run_supervised_rounds(n)
+                except KeyStop:
+                    self.manager.logger.error("Matches were interrupted.")
+                self.manager.logger.setLevel(level)
+                self.cmds.showRanks=True
+            else:
+                self.manager.logger.error(
+                    f"Usage Error: '{n}' is not a valid number of matches.")
         elif self.cmds.forever:
             self.manager.logger.error("Running matches until interrupted. Press <q> or <ESC> key to exit safely.")
             self.run_matches(-1)
@@ -393,7 +404,8 @@ class Commandline:
         if self.cmds.view is not None:
             self.cmds.view = int(self.cmds.view)
             id, filename = self.manager.get_replay_filename(self.cmds.view)
-            self.manager.view_replay(visualizer_command, filename)
+            if filename:            
+                self.manager.view_replay(filename)
             if filename:
                 self.manager.logger.error(f"Viewing replay for Match {id} :: {filename}")
 
