@@ -16,6 +16,7 @@ import random
 import os
 import subprocess
 import logging
+import ast
 from tqdm import tqdm
 
 from halite.manager import match
@@ -29,8 +30,7 @@ class TerminatedException(Exception):
 
 
 class Manager:
-    def __init__(self, halite_binary='./halite/manager/halite', db_filename='/bots/db.sqlite3', record_dir='./replays/', verbosity=logging.DEBUG):
-        self.halite_binary = halite_binary
+    def __init__(self, db_filename='/bots/db.sqlite3', verbosity=logging.DEBUG):
         self.bot = None
         self.players_min = 2
         self.players_max = 4
@@ -45,14 +45,22 @@ class Manager:
         self.priority_sigma = True
         self.exclude_inactive = False
         self.map_width, self.map_height, self.map_seed = None, None, None
-        self.record_dir = record_dir
 
         self.verbosity = verbosity
         self.logger = logging.getLogger()
         self.logger.setLevel(verbosity)
 
         self.refresh_db(db_filename)
-        self.logger.debug('Using database %s' % db_filename)
+        try:
+            _, self.record_dir, self.halite_binary, vis_cmd = self.db.get_options()[0]
+            self.visualizer_cmd = ast.literal_eval(vis_cmd)
+        except ValueError:
+            # no options set in db
+            self.record_dir = ''
+            self.halite_binary = ''
+            self.visualizer_cmd = []
+
+        self.logger.warning('Using database %s' % db_filename)
 
     def refresh_db(self, db_filename=None):
         if db_filename:
@@ -65,8 +73,23 @@ class Manager:
         self.db = database.Database(new_db)
         self.db_filename = new_db
 
+    def set_halite_cmd(self, cmd):
+        self.logger.error(f"Setting halite command to '{cmd}'")
+        self.halite_binary = cmd
+        self.db.set_halite_cmd(cmd)
+
+    def set_visualizer_cmd(self, cmd):
+        self.logger.error(f"Setting visualizer command to '{cmd}'")
+        self.visualizer_cmd = ast.literal_eval(cmd)
+        self.db.set_visualizer_cmd(cmd)
+
+    def set_replay_dir(self, dir):
+        self.logger.error(f"Setting replay directory to '{dir}'")
+        self.record_dir = dir
+        self.db.set_replay_directory(dir)
+
     def activate_all(self):
-        self.logger.debug("Activating all players...")
+        self.logger.warning("Activating all players...")
  #       for player in self.get_all_players():
  #           self.db.activate_player(player.name)
         player_records = self.db.retrieve("select * from players")
@@ -75,7 +98,7 @@ class Manager:
         self.refresh_db()
 
     def deactivate_all(self):
-        self.logger.debug("Deactivating all players...")
+        self.logger.warning("Deactivating all players...")
         self.db.update_many("update players set active=? where name=?", [(0, p.name) for p in self.get_all_players()])
         self.refresh_db()
 
@@ -94,14 +117,14 @@ class Manager:
             self.save_players(match.players)
             self.db.update_player_ranks()
             id, filename = self.db.get_replay_filename(0)
-            logging.warning(f"\nMatch ID: {id} --- Seed: {match.map_seed} --- Size: {match.map_width}x{match.map_height}\nReplay file: {filename}")
+            self.logger.warning(f"\nMatch ID: {id} --- Seed: {match.map_seed} --- Size: {match.map_width}x{match.map_height}\nReplay file: {filename}")
 
             result = ''
             for pid, res in enumerate(match.results):
                 name = match.players[pid].name
                 rank, score = eval(res)
                 result += f"{name:<16}:: Rank: {rank}  Score: {score}\n"
-            logging.warning(result)
+            self.logger.warning(result)
 
         else:
             msg = f"A bot was terminated: {match.terminated} \n{match.players}"
@@ -114,7 +137,7 @@ class Manager:
             self.db.save_player(player)
 
     def pick_contestants(self, num, force=None):
-        self.logger.debug(f"picking {num} contestants")
+        self.logger.debug(f"Picking {num} contestants")
 
         pool = list(self.get_all_players())
         contestants = list()
@@ -127,7 +150,7 @@ class Manager:
         if force is None:
             force = self.bot
         if force:
-            self.logger.debug(f"forcing {force} to play")
+            self.logger.info(f"Forcing {force} to play")
             force = self.get_player(force)
             pool.remove(force)
             num -= 1
@@ -175,7 +198,7 @@ class Manager:
 
         if nrounds >= 0:
             with keyboard_detection() as key_pressed:
-                pbar = tqdm(range(nrounds), leave=False, desc=f'Rounds')
+                pbar = tqdm(range(nrounds), leave=False, desc=f'Rounds', ncols=80)
                 stopped = False
                 for _ in range(nrounds):
                     if key_pressed():
@@ -228,13 +251,13 @@ class Manager:
         :param seed: map seed
         :return: Match object
         '''
-        self.logger.debug("\n------------------- running new match... -------------------\n")
+        self.logger.info("\n------------------- Running new match... -------------------\n")
         m = match.Match(contestants, width, height, seed, self.turn_limit, self.keep_replays,
-                        self.keep_logs, self.no_timeout, record_dir=self.record_dir)
+                        self.keep_logs, self.no_timeout, self.record_dir, self.halite_binary)
         cont_str = '\n'.join([str(c) for c in contestants])
         self.logger.info(f"Contestants:\n{pl.Player.get_columns()}\n{cont_str}")
         try:
-            m.run_match(self.halite_binary)
+            m.run_match()
             self.match_callback(m)
         except TerminatedException as e:
             raise
@@ -260,7 +283,7 @@ class Manager:
             self.db.add_player(name, path)
             self.logger.error(f"Bot '{name}' added to database at '{path}'")
         else:
-            self.logger.error("Bot name %s already used, no bot added" %(name))
+            self.logger.error("Bot name %s ALREADY USED! No bot added" %(name))
 
     def delete_player(self, name):
         self.db.delete_player(name)
@@ -268,12 +291,11 @@ class Manager:
     def edit_path(self, name, path):
         p = self.db.get_player((name,))
         if not p:
-            self.logger.error('Bot name %s not found, no edits made' %(name))
+            self.logger.error('Bot name %s NOT FOUND, no edits made' %(name))
         else:
             p = pl.Player.parse_player_record(p[0])
-            self.logger.error("Updating path for bot %s" % (name))
-            self.logger.error("Old path: %s" % p.path)
-            self.logger.error("New path: %s" % path)
+            self.logger.error("Updating path for bot '%s'" % (name))
+            self.logger.error(f"From: '{p.path}'  to  '{path}'")
             self.db.update_player_path(name, path)
 
     def show_ranks(self, tsv=False):
@@ -287,6 +309,7 @@ class Manager:
 
     def show_results(self, offset, limit):
         results = self.db.get_results(offset, limit)
+        self.logger.info("Match\tBots\t\tPlace/Halite\t\tW   H\tSeed\t\tTime\t\tReplay File")
         for result in results:
             self.logger.info(result)
 
@@ -300,6 +323,17 @@ class Manager:
             self.logger.error(f"Replay was not found :: {filename}")
             return id, None
 
-    @staticmethod
-    def view_replay(visualizer_command, filename):
-        subprocess.Popen(visualizer_command + [filename])
+    def view_replay(self, filename):
+        cmd = []
+        valid = False
+        for idx, value in enumerate(self.visualizer_cmd):
+            if value.upper() == "FILENAME":
+                cmd.append(filename)
+                valid = True
+            else:
+                cmd.append(value)
+        if cmd and valid:
+            self.logger.debug(f"Vis command = \"{cmd}\"")
+            subprocess.Popen(cmd)
+        else:
+            raise ValueError(f"Visualizer command '{self.visualizer_cmd}' invalid.")

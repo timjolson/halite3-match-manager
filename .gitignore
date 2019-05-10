@@ -1,6 +1,9 @@
 __pycache__
 replays/
 bots/
+.idea/
+node_modules/
+fluorine/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
