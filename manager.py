@@ -30,7 +30,6 @@ db_filename = managerfolder+'/bots/db.sqlite3'
 
 class Commandline:
     def __init__(self):
-        #self.manager is created after we know the db_filename, so first two lines of Commandline.act() method
         self.cmds = None
         self.parser = argparse.ArgumentParser()
         self.no_args = False
@@ -57,6 +56,13 @@ class Commandline:
         self.parser.add_argument("-d", "--deactivateBot", dest="deactivateBot",
                                  action = "store", default = "",
                                  help = "Deactivate the named bot")
+
+        self.parser.add_argument('--edit', dest = 'editBot',
+                                 nargs=2, action = 'store', default = [None],
+                                 help = "Edit the path of a bot with: NAME 'NEWPATH'")
+
+        self.parser.add_argument('-rb', dest="resetBot", action="store", default = None,
+                                 help = "Reset a bot's record")
 
         self.parser.add_argument("--activateAll", dest="activateAll",
                                  action="store_true", default=False,
@@ -111,7 +117,7 @@ class Commandline:
                                  help = "Equal priority for all active bots (otherwise highest sigma will always be selected)")
 
         self.parser.add_argument('-p', '--players', dest='player_dist',
-                                 nargs='*', action='store', default=None, type=int,
+                                 nargs='*', action='store', default=[2,4], type=int,
                                  help='Specify a custom distribution of players per match: {2,2,4}')
 
         self.parser.add_argument('--maps', dest = 'map_dist', type = int,
@@ -159,20 +165,13 @@ class Commandline:
 
         ##########
         # Database handling
-        self.parser.add_argument('--reset', dest='reset',
-                                 action = 'store_true', default = False,
-                                 help = 'Delete ALL information in the database, then recreate a new one with existing bot names and paths')
-
-        self.parser.add_argument('-rb', dest="resetBot", action="store", default = None,
-                                 help = "Reset a bot's record")
-
         self.parser.add_argument('-db', dest='db_filename',
                                  action = "store", default = db_filename,
                                  help = 'Specify the database filename')
 
-        self.parser.add_argument('--edit', dest = 'editBot',
-                                 nargs=2, action = 'store', default = [None],
-                                 help = "Edit the path of a bot with: NAME 'NEWPATH'")
+        self.parser.add_argument('--reset', dest='reset',
+                                 action = 'store_true', default = False,
+                                 help = 'Delete ALL information in the database, then recreate a new one with existing bot names and paths')
 
         self.parser.add_argument('--replay_dir', dest='replay_dir',
                                  action = "store", default = None,
@@ -206,13 +205,16 @@ class Commandline:
             self.manager.logger.error("Not enough players for a game. Need at least " + str(self.manager.players_min) + ", only have " + str(len(players)))
             self.manager.logger.error("use the -h flag to get help")
         else:
-            self.manager.run_rounds(rounds, self.cmds.player_dist, self.cmds.map_dist)
+            self.manager.run_rounds(rounds, self.cmds.player_dist, self.cmds.map_width, self.cmds.map_height,
+                                    self.cmds.map_seed, self.cmds.map_dist, self.cmds.playBot)
 
     def act(self):
+        if self.no_args:
+            self.parser.print_help()
+            return
+
         verbosity = (logging.ERROR - self.cmds.verbosity * 10)
         """
-        logging.CRITICAL = 50
-        logging.FATAL = 50
         logging.ERROR = 40
         logging.WARN = 30
         logging.INFO = 20
@@ -222,6 +224,7 @@ class Commandline:
         self.manager = Manager(self.cmds.db_filename, verbosity)
         self.manager.logger.addHandler(logging.StreamHandler(sys.stdout))
 
+        # Clear logs, etc
         if self.cmds.clear_old:
             record_dir = self.manager.record_dir
 
@@ -234,10 +237,12 @@ class Commandline:
             for fl in glob.glob(os.path.join(os.getcwd(), "*.log")):
                 os.remove(fl)
 
+        # Show config options
         if self.cmds.config:
             _, replays, halite, vis = self.manager.db.get_options()[0]
             self.manager.logger.error(f"Replay directory: '{replays}'\nHalite comand: '{halite}'\nVisualizer command: '{vis}'")
 
+        # Change config options
         if self.cmds.halite:
             self.manager.set_halite_cmd(self.cmds.halite)
         if self.cmds.visualizer:
@@ -245,10 +250,12 @@ class Commandline:
         if self.cmds.replay_dir:
             self.manager.set_replay_dir(self.cmds.replay_dir)
 
+        # View match file
         if self.cmds.viewfile:
             self.manager.logger.info("Viewing replay file %s" %(self.cmds.viewfile))
             self.manager.view_replay(self.cmds.viewfile)
 
+        # Reset database
         if self.cmds.reset:
             self.manager.logger.error('You want to reset the database.  This is IRRECOVERABLE.  Make a backup first.')
             self.manager.logger.error('This is equivalent to resetting every bot in the database.')
@@ -260,10 +267,7 @@ class Commandline:
             else:
                 self.manager.logger.error('Database reset aborted. No changes made.')
 
-        if self.cmds.equalPriority:
-            self.manager.logger.debug("priority_sigma = False")
-            self.manager.priority_sigma = False
-
+        # Handle bots
         if self.cmds.addBot[0]:
             self.manager.logger.error("Adding new bot...")
             botPath = self.cmds.addBot[1]
@@ -319,24 +323,7 @@ class Commandline:
             else:
                 self.manager.logger.error('Bot reset aborted. No changes made.')
 
-        if self.cmds.playBot:
-            self.manager.bot = self.cmds.playBot
-            player = self.manager.get_player(self.cmds.playBot)
-            if player:
-                self.manager.logger.error(f"Playing '{self.cmds.playBot}' @'{player.path}'")
-            else:
-                self.manager.logger.error(f"Player '{self.cmds.playBot}' not in database. Ignoring request.")
-
-        if self.cmds.map_seed:
-            self.manager.map_seed = self.cmds.map_seed
-            self.manager.logger.debug(f"map_seed = {self.cmds.map_seed}")
-
-        if self.cmds.map_width or self.cmds.map_height:
-            width = self.cmds.map_width or self.cmds.map_height
-            height = self.cmds.map_height or width
-            self.manager.map_width, self.manager.map_height = width, height
-            self.manager.logger.debug(f"map size = {width}x{height}")
-
+        # Handle logs
         if self.cmds.deleteReplays:
             self.manager.logger.debug("keep_replays = False")
             self.manager.keep_replays = False
@@ -345,6 +332,7 @@ class Commandline:
             self.manager.logger.debug("keep_logs = False")
             self.manager.keep_logs = False
 
+        # Set match conditions
         if self.cmds.noTimeout:
             self.manager.logger.debug("no_timeout = True")
             self.manager.no_timeout = True
@@ -353,13 +341,32 @@ class Commandline:
             self.manager.turn_limit = int(self.cmds.turnLimit) if self.cmds.turnLimit else None
             self.manager.logger.info("Manual turn limit of %s" % (self.cmds.turnLimit))
 
-        if self.cmds.player_dist is not None:
-            self.manager.player_dist = self.cmds.player_dist
-            self.manager.logger.debug('Using player distribution %s' % str(self.cmds.player_dist))
+        if self.cmds.equalPriority:
+            self.manager.logger.debug("priority_sigma = False")
+            self.manager.priority_sigma = False
 
-        if self.cmds.map_dist is not None:
-            self.manager.map_dist = self.cmds.map_dist
-            self.manager.logger.debug('Using map distribution %s' % str(self.cmds.map_dist))
+        # Match handling
+        if self.cmds.playBot:
+            self.manager.bot = self.cmds.playBot
+            player = self.manager.get_player(self.cmds.playBot)
+            if player:
+                self.manager.logger.error(f"Playing '{self.cmds.playBot}' @'{player.path}'")
+            else:
+                self.manager.logger.error(f"Player '{self.cmds.playBot}' not in database. Ignoring request.")
+
+        if self.cmds.match or self.cmds.matches:
+            if self.cmds.map_seed:
+                self.manager.logger.debug(f"map_seed = {self.cmds.map_seed}")
+
+            if self.cmds.map_width or self.cmds.map_height:
+                width = self.cmds.map_width or self.cmds.map_height
+                height = self.cmds.map_height or width
+                self.cmds.map_width, self.cmds.map_height = width, height
+                self.manager.logger.debug(f"map size = {width}x{height}")
+            else:
+                self.manager.logger.debug('Using map distribution %s' % str(self.cmds.map_dist))
+
+            self.manager.logger.debug('Using player distribution %s' % str(self.cmds.player_dist))
 
         if self.cmds.match:
             self.manager.logger.error("Running a single match...")
@@ -372,11 +379,12 @@ class Commandline:
                 level = self.manager.logger.getEffectiveLevel()
                 self.manager.logger.setLevel(logging.ERROR)
                 try:
-                    self.manager.run_supervised_rounds(n)
+                    self.manager.run_supervised_rounds(n, self.cmds.player_dist, self.cmds.map_width, self.cmds.map_height,
+                                    self.cmds.map_seed, self.cmds.map_dist, self.cmds.playBot)
                 except KeyStop:
                     self.manager.logger.error("Matches were interrupted.")
                 self.manager.logger.setLevel(level)
-                self.cmds.showRanks=True
+                self.cmds.showRanks = True
             else:
                 self.manager.logger.error(
                     f"Usage Error: '{n}' is not a valid number of matches.")
@@ -384,14 +392,11 @@ class Commandline:
             self.manager.logger.error("Running matches until interrupted. Press <q> or <ESC> key to exit safely.")
             self.run_matches(-1)
 
-        if self.cmds.excludeInactive:
-            self.manager.logger.debug("exclude_inactive = True")
-            self.manager.exclude_inactive = True
-
+        # Handle showing results/ranks
         if self.cmds.showRanks:
             level = self.manager.logger.getEffectiveLevel()
             self.manager.logger.setLevel(logging.DEBUG)
-            self.manager.show_ranks(tsv=False)
+            self.manager.show_ranks(self.cmds.excludeInactive)
             self.manager.logger.setLevel(level)
 
         if self.cmds.results:
@@ -401,6 +406,7 @@ class Commandline:
             self.manager.show_results(self.cmds.results, self.cmds.limit)
             self.manager.logger.setLevel(level)
 
+        # View replay by match
         if self.cmds.view is not None:
             self.cmds.view = int(self.cmds.view)
             id, filename = self.manager.get_replay_filename(self.cmds.view)
@@ -408,9 +414,6 @@ class Commandline:
                 self.manager.view_replay(filename)
             if filename:
                 self.manager.logger.error(f"Viewing replay for Match {id} :: {filename}")
-
-        if self.no_args:
-            self.parser.print_help()
 
 
 if __name__ == '__main__':

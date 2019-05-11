@@ -1,12 +1,9 @@
-
-import os
 import copy
 import json
-import shutil
 import skills
 import logging
 from skills import trueskill
-from subprocess import Popen, PIPE, call
+from subprocess import Popen, PIPE
 
 
 def update_skills(players, ranks):

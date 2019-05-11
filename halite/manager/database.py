@@ -76,7 +76,6 @@ class Database:
         return self.retrieve(sql, (game_id,))
 
     def get_results(self, offset, limit):
-        #sql = 'SELECT game_id, (GROUP_CONCAT (name)), (GROUP_CONCAT (finish)), map_width, map_height, map_seed, map_generator, timestamp, logs, replay_file FROM results GROUP BY game_id ORDER BY game_id DESC LIMIT ? OFFSET ?'
         sql = 'SELECT game_id, (GROUP_CONCAT (name)), (GROUP_CONCAT (finish)), map_width, map_height, map_seed, timestamp, replay_file FROM results GROUP BY game_id ORDER BY game_id DESC LIMIT ? OFFSET ?'
         return self.retrieve(sql, (limit, offset))
 
