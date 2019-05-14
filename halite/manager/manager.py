@@ -208,7 +208,7 @@ class Manager:
     def run_rounds(self, nrounds=None, player_dist=None, map_width=None, map_height=None, map_seed=None,
                    map_dist=None, force=None, progress_bar=False):
         """
-        Run a number of rounds.
+        Run a number of rounds. Configures then runs multiple matches, calling match_callback on each.
 
         :param nrounds: int, number of rounds to run (-1=forever)
         :param player_dist: [N,N,N], distribution of player count, e.g. [2,4]
@@ -255,18 +255,20 @@ class Manager:
                 if key_pressed():
                     stopped = True
                     break
-                self.configure_match(player_dist, map_width, map_height, map_seed, map_dist, force)
+                m = self.configure_match(player_dist, map_width, map_height, map_seed, map_dist, force)
+                self.run_match(m)
                 pbar.update()
             pbar.close()
             if stopped is True or key_pressed():
                 raise KeyStop()
         else:
             while not key_pressed() and (inf or ((nrounds < 0) or (self.round_count < nrounds))):
-                self.configure_match(player_dist, map_width, map_height, map_seed, map_dist, force)
+                m = self.configure_match(player_dist, map_width, map_height, map_seed, map_dist, force)
+                self.run_match(m)
 
     def configure_match(self, player_dist=None, map_width=None, map_height=None, map_seed=None, map_dist=None, force=None):
         """
-        Select players and options for a match, then run it.
+        Select players and options for a match.
 
         :param player_dist: [N,N,N], distribution of player count, e.g. [2,4]
         :param map_width: int, map units in width
@@ -294,30 +296,26 @@ class Manager:
         cont_str = '\n'.join([str(c) for c in contestants])
         self.logger.debug(f"Contestants:\n{Player.get_columns()}\n{cont_str}")
 
-        m = Match(contestants, size_w, size_h, seed, self.turn_limit, self.keep_replays,
+        return Match(contestants, size_w, size_h, seed, self.turn_limit, self.keep_replays,
                         self.keep_logs, self.no_timeout, self.record_dir, self.halite_binary)
-        m = self.run_match(m)
-        self.round_count += 1
-        return m
 
-    def run_match(self, m):
+    def run_match(self, match):
         """
         Run a Match object. At end of match, self.match_callback(match) is called.
 
-        :param m: halite.manager.match.Match object
+        :param match: halite.manager.match.Match object
         :return: Match
         """
         self.logger.debug("------------------- Running match... -------------------")
         try:
-            m.run_match()
-            self.match_callback(m)
-        except TerminatedException as e:
-            raise
+            match.run_match()
+            self.match_callback(match)
         except Exception as e:
             import traceback
             self.logger.error(f"Exception in run_round:\n{traceback.format_exc()}")
             raise
-        return m
+        self.round_count += 1
+        return match
 
     def get_player(self, name):
         """
