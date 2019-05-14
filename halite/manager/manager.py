@@ -19,9 +19,9 @@ import logging
 import ast
 from tqdm import tqdm
 
-from halite.manager import match
-from halite.manager import database
-from halite.manager import player as pl
+from .match import Match
+from .database import Database
+from .player import Player
 from halite.utils import keyboard_detection, KeyStop
 
 
@@ -33,7 +33,7 @@ class Manager:
     """
     Halite Match Manager.
 
-    Manager('path/to/database/file', verbosity[a logging level])
+    Manager('path/to/database/file')
 
     Attributes
     rounds  # int, number of rounds to play (-1 -> infinite)
@@ -43,9 +43,11 @@ class Manager:
     turn_limit  # int, max number of turns per match
     priority_sigma  # bool, play bot with largest uncertainty first
 
-
     """
-    def __init__(self, db_filename='/bots/db.sqlite3', verbosity=logging.DEBUG):
+    logger = logging.getLogger(__name__)
+    logger.addHandler(logging.NullHandler())
+
+    def __init__(self, db_filename='/bots/db.sqlite3'):
         self.players_min = 2
         self.players_max = 4
         self.player_dist = [2, 4]
@@ -59,25 +61,19 @@ class Manager:
         self.priority_sigma = True
         self.map_width, self.map_height, self.map_seed = None, None, None
 
-        self.verbosity = verbosity
-        self.logger = logging.getLogger()
-        self.logger.setLevel(verbosity)
-
-        self.refresh_db(db_filename)
+        self.reload_db(db_filename)
         try:
             _, self.record_dir, self.halite_binary, vis_cmd = self.db.get_options()[0]
-            self.visualizer_cmd = ast.literal_eval(vis_cmd)
+            self.visualizer_cmd = vis_cmd
         except ValueError:
             # no options set in db
             self.record_dir = ''
             self.halite_binary = ''
-            self.visualizer_cmd = []
+            self.visualizer_cmd = ''
 
-        self.logger.warning('Using database %s' % db_filename)
-
-    def refresh_db(self, db_filename=None):
+    def reload_db(self, db_filename=None):
         """
-        Close currently open database and re-open (or open new provided db).
+        Close currently open database and re-open it (or open new provided db).
         :param db_filename: str, path to database
         :return:
         """
@@ -87,8 +83,10 @@ class Manager:
                 os.mkdir(os.path.dirname(db_filename))
 
         new_db = db_filename or self.db_filename
+        self.logger.error(f"Using database '{db_filename}'")
+
         self.db = None  # close database
-        self.db = database.Database(new_db)
+        self.db = Database(new_db)
         self.db_filename = new_db
 
     def set_halite_cmd(self, cmd):
@@ -110,10 +108,6 @@ class Manager:
         :return:
         """
         self.logger.error(f"Setting visualizer command to '{cmd}'")
-        if isinstance(cmd, str):
-            self.visualizer_cmd = ast.literal_eval(cmd)
-        else:
-            self.visualizer_cmd = cmd
         self.db.set_visualizer_cmd(cmd)
 
     def set_replay_dir(self, dir):
@@ -133,9 +127,9 @@ class Manager:
         """
         self.logger.warning("Activating all players...")
         player_records = self.db.retrieve("select * from players")
-        players = [pl.Player.parse_player_record(player) for player in player_records]
+        players = [Player.parse_player_record(player) for player in player_records]
         self.db.update_many("update players set active=? where name=?", [(1, p.name) for p in players])
-        self.refresh_db()
+        self.reload_db()
 
     def deactivate_all(self):
         """
@@ -144,7 +138,7 @@ class Manager:
         """
         self.logger.warning("Deactivating all players...")
         self.db.update_many("update players set active=? where name=?", [(0, p.name) for p in self.get_all_players()])
-        self.refresh_db()
+        self.reload_db()
 
     def match_callback(self, match):
         """
@@ -161,17 +155,17 @@ class Manager:
             self.save_players(match.players)
             self.db.update_player_ranks()
             id, filename = self.db.get_replay_filename(0)
-            self.logger.warning(f"\nMatch ID: {id} --- Seed: {match.map_seed} --- Size: {match.map_width}x{match.map_height}\nReplay file: {filename}")
+            self.logger.warning(f"Match ID: {id} --- Seed: {match.map_seed} --- Size: {match.map_width}x{match.map_height}\nReplay file: '{filename}'")
 
             result = ''
             for pid, res in enumerate(match.results):
                 name = match.players[pid].name
-                rank, score = eval(res)
-                result += f"{name:<16}:: Rank: {rank}  Score: {score}\n"
+                rank, score = ast.literal_eval(res)
+                result += f"{name:<10}:: Rank: {rank} :: Score: {score}\n"
             self.logger.warning(result)
 
         else:
-            msg = f"A bot was terminated: {match.terminated} \n{match.players}"
+            msg = f"A bot was terminated: {match.terminated}\n{[p.name for p in match.players]}"
             self.logger.error(msg)
             raise TerminatedException(msg)
 
@@ -203,7 +197,6 @@ class Manager:
 #            pool.remove(high_sigma_contestant)
 #            num -= 1
         if force:
-            self.logger.info(f"Forcing {force} to play")
             force = self.get_player(force)
             pool.remove(force)
             num -= 1
@@ -239,6 +232,8 @@ class Manager:
             import msvcrt
             while not msvcrt.kbhit() and ((nrounds < 0) or (self.round_count < nrounds)):
                 self.setup_round(player_dist, map_width, map_height, map_seed, map_dist, force)
+        except KeyStop:
+            self.logger.error("Matches were interrupted.")
 
     def run_supervised_rounds(self, nrounds=None, player_dist=None, map_width=None, map_height=None, map_seed=None, map_dist=None, force=None):
         """
@@ -255,10 +250,19 @@ class Manager:
         if nrounds is None:
             nrounds = self.rounds
 
-        if nrounds >= 0:
-            with keyboard_detection() as key_pressed:
+        if nrounds == 0:
+            self.logger.error(f"ValueError: '{nrounds}' is not a valid number of matches.")
+            return
+
+        self.logger.error(
+            f"Running {nrounds if nrounds!=-1 else 'ENDLESS'} matches, or until interrupted. Press <q> or <ESC> key to exit safely.")
+
+        inf = True if nrounds == -1 else False
+        stopped = False
+
+        with keyboard_detection() as key_pressed:
+            if not inf:
                 pbar = tqdm(range(nrounds), leave=False, desc=f'Rounds', ncols=80)
-                stopped = False
                 for _ in range(nrounds):
                     if key_pressed():
                         stopped = True
@@ -266,11 +270,12 @@ class Manager:
                     self.setup_round(player_dist, map_width, map_height, map_seed, map_dist, force)
                     pbar.update()
                 pbar.close()
-                if stopped or key_pressed():
-                    raise KeyStop
-        else:
-            while True:
-                self.setup_round(player_dist, map_width, map_height, map_seed, map_dist, force)
+            else:
+                while not key_pressed():
+                    self.setup_round(player_dist, map_width, map_height, map_seed, map_dist, force)
+
+            if stopped or key_pressed():
+                raise KeyStop()
 
     def setup_round(self, player_dist=None, map_width=None, map_height=None, map_seed=None, map_dist=None, force=None):
         """
@@ -293,31 +298,29 @@ class Manager:
         else:
             num_contestants = self.players_min
         contestants = self.pick_contestants(num_contestants, force=force)
-        self.logger.debug('\n'.join([str(c) for c in contestants]))
 
         size_w = map_width or map_height or random.choice(map_dist)
         size_h = map_height or size_w
         seed = map_seed or random.randint(10000, 2073741824)
 
-        match = self.run_single_round(contestants, size_w, size_h, seed)
+        self.logger.debug("\n------------------- Creating new match... -------------------")
+        cont_str = '\n'.join([str(c) for c in contestants])
+        self.logger.debug(f"Contestants:\n{Player.get_columns()}\n{cont_str}")
+
+        m = Match(contestants, size_w, size_h, seed, self.turn_limit, self.keep_replays,
+                        self.keep_logs, self.no_timeout, self.record_dir, self.halite_binary)
+        m = self.run_match(m)
         self.round_count += 1
-        return match
+        return m
 
-    def run_single_round(self, contestants, width, height, seed):
+    def run_match(self, m):
         """
-        Create and run a Match. At end of match, self.match_callback(match) is called.
+        Run a Match. At end of match, self.match_callback(match) is called.
 
-        :param contestants: iterable of Player objects to compete
-        :param width: map width
-        :param height: map height
-        :param seed: map seed
+        :param m: halite.manager.match.Match object
         :return: Match
         """
-        self.logger.info("\n------------------- Running new match... -------------------\n")
-        m = match.Match(contestants, width, height, seed, self.turn_limit, self.keep_replays,
-                        self.keep_logs, self.no_timeout, self.record_dir, self.halite_binary)
-        cont_str = '\n'.join([str(c) for c in contestants])
-        self.logger.info(f"Contestants:\n{pl.Player.get_columns()}\n{cont_str}")
+        self.logger.debug("------------------- Running match... -------------------")
         try:
             m.run_match()
             self.match_callback(m)
@@ -336,7 +339,7 @@ class Manager:
         :return: Player
         """
         player = self.db.get_player([name])[0]
-        player = pl.Player.parse_player_record(player)
+        player = Player.parse_player_record(player)
         return player
 
     def get_all_players(self):
@@ -345,7 +348,7 @@ class Manager:
         :return: [Player object for each active player in database]
         """
         player_records = self.db.retrieve("select * from players where active > 0")
-        players = [pl.Player.parse_player_record(player) for player in player_records]
+        players = [Player.parse_player_record(player) for player in player_records]
         return players
 
     def add_player(self, name, path):
@@ -381,9 +384,8 @@ class Manager:
         if not p:
             self.logger.error('Bot name %s NOT FOUND, no edits made' %(name))
         else:
-            p = pl.Player.parse_player_record(p[0])
-            self.logger.error("Updating path for bot '%s'" % (name))
-            self.logger.error(f"From: '{p.path}'  to  '{path}'")
+            p = Player.parse_player_record(p[0])
+            self.logger.error(f"Updating path for bot '{name}' from: '{p.path}'  to  '{path}'")
             self.db.update_player_path(name, path)
 
     def show_ranks(self, exclude_inactive=False):
@@ -392,10 +394,10 @@ class Manager:
         :param exclude_inactive: bool, leave out deactivated bots
         :return:
         """
-        self.logger.info('\n'+pl.Player.get_columns())
+        self.logger.info('\n'+Player.get_columns())
         sql = "select * from players where active > 0 order by skill desc" if exclude_inactive else "select * from players order by skill desc"
         for p in self.db.retrieve(sql):
-            self.logger.info(pl.Player.parse_player_record(p))
+            self.logger.info(Player.parse_player_record(p))
 
     def show_results(self, offset, limit):
         """
@@ -413,16 +415,17 @@ class Manager:
         """
         Get filename of stored replay.
         :param id: int, 0:latest, <0:run match backwards from last, >0:match reference number
-        :return: (id, filename), (int:match reference number, str:replay filename)
+        :return: (id, filename), (int:match reference number, str or None:replay filename)
         """
-        id, filename = self.db.get_replay_filename(id)
+        ID, filename = self.db.get_replay_filename(id)
+        self.logger.debug(f"Database.get_replay_filename({id}=>{ID}): '{filename}'")
         if filename == 'No Replay Was Stored':
-            return id, filename
+            return ID, filename
         elif os.path.isfile(filename):
-            return id, filename
+            return ID, filename
         else:
-            self.logger.error(f"Replay was not found :: {filename}")
-            return id, None
+            self.logger.error(f"Replay file NOT FOUND :: {filename}")
+            return ID, None
 
     def view_replay(self, filename):
         """
@@ -430,16 +433,6 @@ class Manager:
         :param filename: str, replay file
         :return:
         """
-        cmd = []
-        valid = False
-        for idx, value in enumerate(self.visualizer_cmd):
-            if value.upper() == "FILENAME":
-                cmd.append(filename)
-                valid = True
-            else:
-                cmd.append(value)
-        if cmd and valid:
-            self.logger.debug(f"Vis command = \"{cmd}\"")
-            subprocess.Popen(cmd)
-        else:
-            raise ValueError(f"Visualizer command '{self.visualizer_cmd}' invalid.")
+        cmd = self.visualizer_cmd.replace('FILENAME', filename)
+        self.logger.debug(f"Visualizer command = \"{cmd}\"")
+        subprocess.Popen(cmd, shell=True)

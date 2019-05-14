@@ -25,4 +25,4 @@ cd ..
 
 # Config manager
 mkdir replays
-./manager.py --halite './halite/manager/halite' --visualizer "['./fluorine/node_modules/.bin/electron', './fluorine', '-o', 'FILENAME']" --replay_dir './replays'
+./manager.py --halite './halite/manager/halite' --visualizer "./fluorine/node_modules/.bin/electron ./fluorine -o FILENAME" --replay_dir './replays'

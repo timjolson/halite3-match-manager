@@ -1,7 +1,6 @@
 import sqlite3
 import datetime
 import os
-import logging
 from .player import Player
 
 
@@ -13,7 +12,8 @@ class Database:
     def __del__(self):
         try:
             self.db.close()
-        except: pass
+        except:
+            pass
 
     def now(self):
         return datetime.datetime.now().strftime("%d.%m.%Y %H:%M:%S")
@@ -25,11 +25,11 @@ class Database:
             cursor.execute("create table players(id integer primary key, name text unique, path text, lastseen date, rank integer default 1000, skill real default 0.0, mu real default 25.0, sigma real default 8.33,ngames integer default 0, active integer default 1)")
             cursor.execute("create table options(id integer primary key, replay_dir text, halite_cmd text, visualizer_cmd text)")
             self.db.commit()
-            self.update("insert into options values(0,?,?,?)", ("", "", "[]"))
+            self.update("insert into options values(0,?,?,?)", ("", "", ""))
         except:
             pass
 
-    def update_deferred( self, sql, tup=() ):
+    def update_deferred( self, sql, tup=()):
         cursor = self.db.cursor()        
         cursor.execute(sql,tup)
         
@@ -80,7 +80,6 @@ class Database:
         return self.retrieve(sql, (limit, offset))
 
     def get_replay_filename(self, id):
-        ID = id
         if id <= 0:
             sql = 'SELECT game_id FROM results ORDER BY game_id DESC LIMIT ? OFFSET ?'
             try:
@@ -91,7 +90,6 @@ class Database:
             id = game_id
         sql = 'SELECT replay_file FROM results WHERE game_id = ?'
         result = self.retrieve(sql, (id,))
-        logging.debug(f"Database.get_replay_filename({ID}=>{id}): '{result[0][0]}'")
         return id, result[0][0]
 
     def save_player(self, player):
@@ -125,8 +123,8 @@ class Database:
     def set_halite_cmd(self, cmd):
         self._change_option('halite_cmd', cmd)
 
-    def set_visualizer_cmd(self, cmd_list):
-        self._change_option('visualizer_cmd', str(cmd_list))
+    def set_visualizer_cmd(self, cmd):
+        self._change_option('visualizer_cmd', str(cmd))
 
     def get_options(self):
         sql = 'select * from options where id=? '

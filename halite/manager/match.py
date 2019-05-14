@@ -6,24 +6,10 @@ from skills import trueskill
 from subprocess import Popen, PIPE
 
 
-def update_skills(players, ranks):
-    """ Update player skills based on ranks from a match """
-    teams = [skills.Team({player.name: skills.GaussianRating(player.mu, player.sigma)}) for player in players]
-    match = skills.Match(teams, ranks)
-    calc = trueskill.FactorGraphTrueSkillCalculator()
-    game_info = trueskill.TrueSkillGameInfo()
-    game_info.dynamics_factor = 0.1
-    updated = calc.new_ratings(match, game_info)
-    logging.debug("\nUpdating ranks")
-    for team in updated:
-        player_name, skill_data = next(iter(team.items()))    #in Halite, teams will always be a team of one player
-        player = next(player for player in players if player.name == str(player_name))   #this suggests that players should be a dictionary instead of a list
-        player.mu = skill_data.mean
-        player.sigma = skill_data.stdev
-        player.update_skill()
-        logging.debug("skill = %4f  mu = %3f  sigma = %3f  name = %s" % (player.skill, player.mu, player.sigma, str(player_name)))
-
 class Match:
+    logger = logging.getLogger(__name__)
+    logger.addHandler(logging.NullHandler())
+
     def __init__(self, players, width, height, seed, turn_limit, keep_replays, keep_logs, no_timeout, record_dir, halite_binary):
         self.map_seed = seed
         self.map_height = height
@@ -31,6 +17,8 @@ class Match:
         self.players = players
         self.paths = [player.path for player in players]
         self.finished = False
+        self.stats = None
+        self.terminated = False
         self.results = [0 for _ in players]
         self.return_code = None
         self.results_string = ""
@@ -69,40 +57,52 @@ class Match:
         result.append("--results-as-json")
         result.append("-s " + str(self.map_seed))
 
-        return [r for r in result if r] + self.paths
+        cmd = [r for r in result if r] + self.paths
+        self.logger.debug("Command = " + str(' '.join(cmd)))
+        return cmd
 
     def run_match(self):
         command = self.get_command()
-        logging.debug("Command = " + str(command))
         p = Popen(command, stdin=None, stdout=PIPE, stderr=None)
+        self.logger.debug(f"Command executing for < {self.total_time_limit} seconds...")
         results, _ = p.communicate(None, self.total_time_limit)
+        self.finished = True
         self.results_string = results.decode('ascii')
         self.return_code = p.returncode
+        self.logger.debug(f"Command returned: {self.return_code}")
         self.parse_results_string()
-        update_skills(self.players, copy.deepcopy(self.results))
+        self.update_skills(self.players, copy.deepcopy(self.results))
 
     def parse_results_string(self):
-        logging.debug("parsing results a")
         data = json.loads(self.results_string)
-        logging.debug("parsing results b")
         self.logs = data['error_logs']
-        logging.debug("parsing results c")
         self.map_height = data['map_height']
-        logging.debug("parsing results d")
         self.map_width = data['map_width']
-        logging.debug("parsing results e")
         self.map_seed = data['map_seed']
-        logging.debug("parsing results f")
         self.map_generator = data['map_generator']
-        logging.debug("parsing results g")
         self.replay_file = data.get('replay', 'No Replay Was Stored')
-        logging.debug("parsing results h")
         self.stats = data['stats']
-        logging.debug("parsing results i")
         self.terminated = data['terminated']
-        logging.debug("parsing results j")
         for player_index_string in self.stats:
             player_index = int(player_index_string)
             rank_string = self.stats[player_index_string]['rank']
             halite_string = self.stats[player_index_string]['score']
             self.results[player_index] = str((rank_string, halite_string))
+
+    def update_skills(self, players, ranks):
+        """ Update player skills based on ranks from a match """
+        teams = [skills.Team({player.name: skills.GaussianRating(player.mu, player.sigma)}) for player in players]
+        match = skills.Match(teams, ranks)
+        calc = trueskill.FactorGraphTrueSkillCalculator()
+        game_info = trueskill.TrueSkillGameInfo()
+        game_info.dynamics_factor = 0.2
+        updated = calc.new_ratings(match, game_info)
+        self.logger.debug("\nUpdating ranks")
+        for team in updated:
+            player_name, skill_data = next(iter(team.items()))  # in Halite, teams will always be a team of one player
+            player = next(player for player in players if player.name == str(
+                player_name))  # this suggests that players should be a dictionary instead of a list
+            player.mu = skill_data.mean
+            player.sigma = skill_data.stdev
+            player.update_skill()
+            self.logger.debug("skill = %4f  mu = %3f  sigma = %3f  name = %s" % (player.skill, player.mu, player.sigma, str(player_name)))

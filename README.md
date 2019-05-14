@@ -62,7 +62,6 @@ To visualize a replay file:
 Increase verbosity (manager is nearly silent otherwise):
 ```
     ./manager.py -v ...
-    ./manager.py -vv ...
     ./manager.py -vvv ...
 ```
 
@@ -131,5 +130,4 @@ See recommended setup and configuration [unix script](https://gitlab.com/timjols
     
     # visualizer command
     # FILENAME gets replaced at runtime for each usage
-    # this example runs command "vis.exe opt1 FILENAME opt2"
-    ./manager.py --visalizer "['vis.exe', 'opt1', 'FILENAME', 'opt2']"
+    ./manager.py --visalizer "vis.exe -opt1 FILENAME opt2"
