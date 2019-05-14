@@ -377,12 +377,9 @@ class Commandline:
                                         self.cmds.map_seed, self.cmds.map_dist, self.cmds.playBot, progress_bar=True)
             except KeyStop:
                 pass
-            else:
-                self.cmds.showRanks = True
         elif self.cmds.forever:
             self.manager.run_rounds(-1, self.cmds.player_dist, self.cmds.map_width, self.cmds.map_height,
                                     self.cmds.map_seed, self.cmds.map_dist, self.cmds.playBot)
-            self.cmds.showRanks = True
 
         # Handle showing results/ranks
         if self.cmds.showRanks:
