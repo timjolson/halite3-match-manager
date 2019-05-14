@@ -82,10 +82,11 @@ Advanced options:
     --maps N              # map size is N
 ```
 
-Clear *.log and replay files (in ./ and in replay directory set in manager.py):
+Advanced data options:
 ```
-    --clear  # clearing happens before other commands are run
-    --reset  # builds new database (no records), keeping bots and options
+    --config # Show configuration settings in database
+    --clear  # Clear *.log and replay files (in ./ and in replay directory set in manager.py)
+    --reset  # Builds fresh database keeping bots and settings
 ```
 
 
