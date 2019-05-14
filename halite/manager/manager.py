@@ -47,7 +47,7 @@ class Manager:
     logger = logging.getLogger(__name__)
     logger.addHandler(logging.NullHandler())
 
-    def __init__(self, db_filename='/bots/db.sqlite3'):
+    def __init__(self, db_filename):
         self.players_min = 2
         self.players_max = 4
         self.player_dist = [2, 4]
@@ -102,9 +102,8 @@ class Manager:
     def set_visualizer_cmd(self, cmd):
         """
         Change command to run for visualizing a replay.
-        Command elements will be concatenated as arguments to commandline.
         FILENAME will be replaced with each usage.
-        :param cmd: str, e.g. "['executable', 'option', ..., 'FILENAME', 'option']"
+        :param cmd: str, e.g. "executable option FILENAME option"
         :return:
         """
         self.logger.error(f"Setting visualizer command to '{cmd}'")
@@ -142,7 +141,7 @@ class Manager:
 
     def match_callback(self, match):
         """
-        Post Match callback.
+        Post-match callback.
         Does the following:
         1. Adds match to database
         2. Saves players' new skills and ranks if none were terminated
@@ -166,7 +165,6 @@ class Manager:
 
         else:
             msg = f"A bot was terminated: {match.terminated}\n{[p.name for p in match.players]}"
-            self.logger.error(msg)
             raise TerminatedException(msg)
 
     def save_players(self, players):
@@ -207,7 +205,8 @@ class Manager:
         random.shuffle(contestants)
         return contestants
 
-    def run_rounds(self, nrounds=None, player_dist=None, map_width=None, map_height=None, map_seed=None, map_dist=None, force=None):
+    def run_rounds(self, nrounds=None, player_dist=None, map_width=None, map_height=None, map_seed=None,
+                   map_dist=None, force=None, progress_bar=False):
         """
         Run a number of rounds.
 
@@ -215,69 +214,57 @@ class Manager:
         :param player_dist: [N,N,N], distribution of player count, e.g. [2,4]
         :param map_width: int, map units in width
         :param map_height: int, map units in height
-        :param map_dist: [N,N,N], distribution of map size, e.g. [32,40,48,56,64]
+        :param map_dist: [N,N,N], distribution of map size (overridden if a dimension specified)
+                    e.g. [32,40,48,56,64]
         :param force: str, name of bot to force into playing
-        :return:
-        """
-        if nrounds is None:
-            nrounds = self.rounds
-
-        try:
-            # run unix
-            with keyboard_detection() as key_pressed:
-                while not key_pressed() and ((nrounds < 0) or (self.round_count < nrounds)):
-                    self.setup_round(player_dist, map_width, map_height, map_seed, map_dist, force)
-        except ImportError:
-            # run windows
-            import msvcrt
-            while not msvcrt.kbhit() and ((nrounds < 0) or (self.round_count < nrounds)):
-                self.setup_round(player_dist, map_width, map_height, map_seed, map_dist, force)
-        except KeyStop:
-            self.logger.error("Matches were interrupted.")
-
-    def run_supervised_rounds(self, nrounds=None, player_dist=None, map_width=None, map_height=None, map_seed=None, map_dist=None, force=None):
-        """
-        Run rounds with progress bar.
-
-        :param nrounds: int, number of rounds to run (-1=forever)
-        :param player_dist: [N,N,N], distribution of player count, e.g. [2,4]
-        :param map_width: int, map units in width
-        :param map_height: int, map units in height
-        :param map_dist: [N,N,N], distribution of map size, e.g. [32,40,48,56,64]
-        :param force: str, name of bot to force into playing
+        :param progress_bar: bool, whether to display progress bar (when nrounds > 1)
         :return:
         """
         if nrounds is None:
             nrounds = self.rounds
 
         if nrounds == 0:
-            self.logger.error(f"ValueError: '{nrounds}' is not a valid number of matches.")
-            return
+            raise ValueError("'{nrounds}' is not a valid number of matches.")
+
+        inf = (nrounds == -1)
+        progress_bar = (nrounds > 1) and progress_bar
 
         self.logger.error(
-            f"Running {nrounds if nrounds!=-1 else 'ENDLESS'} matches, or until interrupted. Press <q> or <ESC> key to exit safely.")
+            f"Running {'ENDLESS' if inf is True else nrounds} match(es), or until interrupted. Press <q> or <ESC> key to exit safely.")
 
-        inf = True if nrounds == -1 else False
+        try:
+            # run unix
+            with keyboard_detection() as key_pressed:
+                self._run_deferred(key_pressed, nrounds, player_dist, map_width, map_height, map_seed, map_dist,
+                                   force, progress_bar)
+        except ImportError:
+            # run windows
+            import msvcrt
+            self._run_deferred(msvcrt.kbhit, nrounds, player_dist, map_width, map_height, map_seed, map_dist,
+                               force, progress_bar)
+
+    def _run_deferred(self, key_pressed, nrounds=None, player_dist=None, map_width=None, map_height=None, map_seed=None,
+                   map_dist=None, force=None, progress_bar=False):
+        inf = (nrounds == -1)
+        progress_bar = (nrounds > 1) and progress_bar
         stopped = False
 
-        with keyboard_detection() as key_pressed:
-            if not inf:
-                pbar = tqdm(range(nrounds), leave=False, desc=f'Rounds', ncols=80)
-                for _ in range(nrounds):
-                    if key_pressed():
-                        stopped = True
-                        break
-                    self.setup_round(player_dist, map_width, map_height, map_seed, map_dist, force)
-                    pbar.update()
-                pbar.close()
-            else:
-                while not key_pressed():
-                    self.setup_round(player_dist, map_width, map_height, map_seed, map_dist, force)
-
-            if stopped or key_pressed():
+        if progress_bar is True:
+            pbar = tqdm(range(nrounds), leave=False, desc=f'Rounds', ncols=80)
+            for _ in range(nrounds):
+                if key_pressed():
+                    stopped = True
+                    break
+                self.configure_match(player_dist, map_width, map_height, map_seed, map_dist, force)
+                pbar.update()
+            pbar.close()
+            if stopped is True or key_pressed():
                 raise KeyStop()
+        else:
+            while not key_pressed() and (inf or ((nrounds < 0) or (self.round_count < nrounds))):
+                self.configure_match(player_dist, map_width, map_height, map_seed, map_dist, force)
 
-    def setup_round(self, player_dist=None, map_width=None, map_height=None, map_seed=None, map_dist=None, force=None):
+    def configure_match(self, player_dist=None, map_width=None, map_height=None, map_seed=None, map_dist=None, force=None):
         """
         Select players and options for a match, then run it.
 
@@ -315,7 +302,7 @@ class Manager:
 
     def run_match(self, m):
         """
-        Run a Match. At end of match, self.match_callback(match) is called.
+        Run a Match object. At end of match, self.match_callback(match) is called.
 
         :param m: halite.manager.match.Match object
         :return: Match

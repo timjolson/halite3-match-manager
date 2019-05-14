@@ -22,10 +22,9 @@ from halite.utils import MultilineFormatter, KeyStop
 
 # folders
 managerfolder = os.path.abspath(os.path.dirname(__file__))
-mainfolder = os.path.abspath(os.path.dirname(managerfolder))
 
 # default database
-db_filename = managerfolder+'/bots/db.sqlite3'
+db_filename = os.path.join(managerfolder, 'bots/db.sqlite3')
 
 
 class Commandline:
@@ -374,14 +373,14 @@ class Commandline:
                                     self.cmds.map_seed, self.cmds.map_dist, self.cmds.playBot)
         elif self.cmds.matches:
             try:
-                self.manager.run_supervised_rounds(self.cmds.matches, self.cmds.player_dist, self.cmds.map_width, self.cmds.map_height,
-                                        self.cmds.map_seed, self.cmds.map_dist, self.cmds.playBot)
+                self.manager.run_rounds(self.cmds.matches, self.cmds.player_dist, self.cmds.map_width, self.cmds.map_height,
+                                        self.cmds.map_seed, self.cmds.map_dist, self.cmds.playBot, progress_bar=True)
             except KeyStop:
                 pass
             else:
                 self.cmds.showRanks = True
         elif self.cmds.forever:
-            self.manager.run_supervised_rounds(-1, self.cmds.player_dist, self.cmds.map_width, self.cmds.map_height,
+            self.manager.run_rounds(-1, self.cmds.player_dist, self.cmds.map_width, self.cmds.map_height,
                                     self.cmds.map_seed, self.cmds.map_dist, self.cmds.playBot)
             self.cmds.showRanks = True
 
