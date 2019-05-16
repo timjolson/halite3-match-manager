@@ -368,10 +368,8 @@ class Commandline:
             logger.debug('Using player distribution %s' % str(self.cmds.player_dist))
 
         if self.cmds.match:
-            logger.error("Running a single match...")
-            self.manager.run_rounds(1, self.cmds.player_dist, self.cmds.map_width, self.cmds.map_height,
-                                    self.cmds.map_seed, self.cmds.map_dist, self.cmds.playBot)
-        elif self.cmds.matches:
+            self.cmds.matches = 1
+        if self.cmds.matches:
             try:
                 self.manager.run_rounds(self.cmds.matches, self.cmds.player_dist, self.cmds.map_width, self.cmds.map_height,
                                         self.cmds.map_seed, self.cmds.map_dist, self.cmds.playBot, progress_bar=True)

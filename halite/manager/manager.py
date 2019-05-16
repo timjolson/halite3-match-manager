@@ -53,7 +53,7 @@ class Manager:
         self.player_dist = [2, 4]
         self.map_dist = [i*8 for i in range(4, 9)]
         self.rounds = -1
-        self.round_count = 0
+        # self.round_count = 0
         self.keep_replays = True
         self.keep_logs = True
         self.no_timeout = False
@@ -227,8 +227,6 @@ class Manager:
             raise ValueError("'{nrounds}' is not a valid number of matches.")
 
         inf = (nrounds == -1)
-        progress_bar = (nrounds > 1) and progress_bar
-
         self.logger.error(
             f"Running {'ENDLESS' if inf is True else nrounds} match(es), or until interrupted. Press <q> or <ESC> key to exit safely.")
 
@@ -249,6 +247,7 @@ class Manager:
         progress_bar = (nrounds > 1) and progress_bar
         stopped = False
 
+        # N rounds, with progress bar
         if progress_bar is True:
             pbar = tqdm(range(nrounds), leave=False, desc=f'Rounds', ncols=80)
             for _ in range(nrounds):
@@ -262,9 +261,22 @@ class Manager:
             if stopped is True or key_pressed():
                 raise KeyStop()
         else:
-            while not key_pressed() and (inf or ((nrounds < 0) or (self.round_count < nrounds))):
-                m = self.configure_match(player_dist, map_width, map_height, map_seed, map_dist, force)
-                self.run_match(m)
+            # infinite rounds
+            if inf:
+                while not key_pressed():
+                    m = self.configure_match(player_dist, map_width, map_height, map_seed, map_dist, force)
+                    self.run_match(m)
+
+            # N rounds
+            else:
+                for _ in range(nrounds):
+                    if key_pressed():
+                        stopped = True
+                        break
+                    m = self.configure_match(player_dist, map_width, map_height, map_seed, map_dist, force)
+                    self.run_match(m)
+                if stopped is True or key_pressed():
+                    raise KeyStop()
 
     def configure_match(self, player_dist=None, map_width=None, map_height=None, map_seed=None, map_dist=None, force=None):
         """
@@ -314,7 +326,7 @@ class Manager:
             import traceback
             self.logger.error(f"Exception in run_round:\n{traceback.format_exc()}")
             raise
-        self.round_count += 1
+        # self.round_count += 1
         return match
 
     def get_player(self, name):
