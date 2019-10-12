@@ -210,7 +210,8 @@ class Commandline:
         """
         h = logging.StreamHandler(sys.stdout)
         if verbosity <= 10:
-            h.setFormatter(MultilineFormatter("%(levelname)s:%(name)s:%(funcName)s:%(lineno)d:%(message)s"))
+            # h.setFormatter(MultilineFormatter("%(levelno)d:%(name)s:%(funcName)s():line #%(lineno)d:%(message)s"))
+            h.setFormatter(MultilineFormatter("%(message)s"))
         logger = Manager.logger
         logger.addHandler(h)
         logger.setLevel(verbosity)
@@ -399,7 +400,7 @@ class Commandline:
             id, filename = self.manager.get_replay_filename(self.cmds.view)
             if filename != "No Replay Was Stored":
                 self.manager.view_replay(filename)
-            logger.error(f"Viewing replay for Match {id} :: {filename}")
+            logger.error(f"Viewing replay for Match {id} -- {filename}")
 
 
 if __name__ == '__main__':
