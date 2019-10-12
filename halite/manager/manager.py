@@ -18,6 +18,8 @@ import subprocess
 import logging
 import ast
 from tqdm import tqdm
+import skills
+from skills import trueskill
 
 from .match import Match
 from .database import Database
@@ -139,6 +141,24 @@ class Manager:
         self.db.update_many("update players set active=? where name=?", [(0, p.name) for p in self.get_all_players()])
         self.reload_db()
 
+    def update_skills(self, players, ranks):
+        """ Update player skills based on ranks from a match """
+        teams = [skills.Team({player.name: skills.GaussianRating(player.mu, player.sigma)}) for player in players]
+        match = skills.Match(teams, ranks)
+        calc = trueskill.FactorGraphTrueSkillCalculator()
+        game_info = trueskill.TrueSkillGameInfo()
+        game_info.dynamics_factor = 0.2
+        updated = calc.new_ratings(match, game_info)
+        self.logger.debug("\nUpdating ranks")
+        for team in updated:
+            player_name, skill_data = next(iter(team.items()))  # in Halite, teams will always be a team of one player
+            player = next(player for player in players if player.name == str(
+                player_name))  # this suggests that players should be a dictionary instead of a list
+            player.mu = skill_data.mean
+            player.sigma = skill_data.stdev
+            player.update_skill()
+            self.logger.debug("skill = %4f  mu = %3f  sigma = %3f  name = %s" % (player.skill, player.mu, player.sigma, str(player_name)))
+
     def match_callback(self, match):
         """
         Post-match callback.
@@ -151,16 +171,18 @@ class Manager:
         self.db.add_match(match)
 
         if not any(match.terminated.values()):
-            self.save_players(match.players)
-            self.db.update_player_ranks()
+            results = [ast.literal_eval(mr) for mr in match.results]  # get tuple from strings stored in database
+            self.update_skills(match.players, [i[0] for i in results])  # tuple ~ (rank, halite)
+            self.save_players(match.players)  # save player's skill info
+            self.db.update_player_ranks()  # update all player ranks
             id, filename = self.db.get_replay_filename(0)
-            self.logger.warning(f"Match ID: {id} --- Seed: {match.map_seed} --- Size: {match.map_width}x{match.map_height}\nReplay file: '{filename}'")
+            self.logger.warning(f"Match ID: {id} -- Seed: {match.map_seed} -- Size: {match.map_width}x{match.map_height}\nReplay: '{filename}'")
 
             result = ''
-            for pid, res in enumerate(match.results):
+            for pid, res in enumerate(results):
                 name = match.players[pid].name
-                rank, score = ast.literal_eval(res)
-                result += f"{name:<10}:: Rank: {rank} :: Score: {score}\n"
+                rank, score = res
+                result += f"{name:<10} -- Rank: {rank} -- Score: {score}\n"
             self.logger.warning(result)
 
         else:
@@ -421,7 +443,7 @@ class Manager:
         elif os.path.isfile(filename):
             return ID, filename
         else:
-            self.logger.error(f"Replay file NOT FOUND :: {filename}")
+            self.logger.error(f"Replay file NOT FOUND -- {filename}")
             return ID, None
 
     def view_replay(self, filename):

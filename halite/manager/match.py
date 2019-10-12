@@ -1,8 +1,5 @@
-import copy
 import json
-import skills
 import logging
-from skills import trueskill
 from subprocess import Popen, PIPE
 
 
@@ -19,7 +16,7 @@ class Match:
         self.finished = False
         self.stats = None
         self.terminated = False
-        self.results = [0 for _ in players]
+        self.results = ['' for _ in players]
         self.return_code = None
         self.results_string = ""
         self.replay_file = ""
@@ -71,7 +68,6 @@ class Match:
         self.return_code = p.returncode
         self.logger.debug(f"Command returned: {self.return_code}")
         self.parse_results_string()
-        self.update_skills(self.players, copy.deepcopy(self.results))
 
     def parse_results_string(self):
         data = json.loads(self.results_string)
@@ -88,21 +84,3 @@ class Match:
             rank_string = self.stats[player_index_string]['rank']
             halite_string = self.stats[player_index_string]['score']
             self.results[player_index] = str((rank_string, halite_string))
-
-    def update_skills(self, players, ranks):
-        """ Update player skills based on ranks from a match """
-        teams = [skills.Team({player.name: skills.GaussianRating(player.mu, player.sigma)}) for player in players]
-        match = skills.Match(teams, ranks)
-        calc = trueskill.FactorGraphTrueSkillCalculator()
-        game_info = trueskill.TrueSkillGameInfo()
-        game_info.dynamics_factor = 0.2
-        updated = calc.new_ratings(match, game_info)
-        self.logger.debug("\nUpdating ranks")
-        for team in updated:
-            player_name, skill_data = next(iter(team.items()))  # in Halite, teams will always be a team of one player
-            player = next(player for player in players if player.name == str(
-                player_name))  # this suggests that players should be a dictionary instead of a list
-            player.mu = skill_data.mean
-            player.sigma = skill_data.stdev
-            player.update_skill()
-            self.logger.debug("skill = %4f  mu = %3f  sigma = %3f  name = %s" % (player.skill, player.mu, player.sigma, str(player_name)))
