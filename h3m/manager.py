@@ -24,7 +24,7 @@ from skills import trueskill
 from .match import Match
 from .database import Database
 from .player import Player
-from halite.utils import keyboard_detection, KeyStop
+from h3m.utils import keyboard_detection, KeyStop
 
 
 class TerminatedException(Exception):

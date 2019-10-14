@@ -1,0 +1,1 @@
+import h3m.__main__

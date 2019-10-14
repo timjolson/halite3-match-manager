@@ -1,7 +1,11 @@
+import logging
 import sys
 import os
 import termios
 from select import select
+
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
 
 class KeyStop(Exception):
@@ -53,14 +57,20 @@ class keyboard_detection:
         return key in keys
 
 
-if __name__ == '__main__':
+class MultilineFormatter(logging.Formatter):
+    """
+    Isnpired by https://stackoverflow.com/a/45217732
+    """
 
-    from time import sleep
-
-    with keyboard_detection() as key_pressed:
-        while not key_pressed():
-            sys.stdout.write('.')
-            sys.stdout.flush()
-            sleep(0.5)
-
-    print('done')
+    def format(self, record: logging.LogRecord):
+        save_msg = record.msg
+        if not isinstance(save_msg, str):
+            save_msg = str(save_msg)
+        output = ""
+        for line in save_msg.splitlines():
+            record.msg = line
+            output += super().format(record) + "\n"
+        output = output[:-1]
+        record.msg = save_msg
+        record.message = output
+        return output

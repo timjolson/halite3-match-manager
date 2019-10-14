@@ -10,6 +10,14 @@ Usage
 
 Command line script "halite3-match-manager/manager.py" provides an easy access interface.
 
+Run the commandline like:
+```
+    ./manager.py (when in halite3-match-manager directory)
+    python3 . (when in halite3-match-manager directory)
+    python3 -m h3m (if package is installed)
+```
+
+
 Examples of Bash command line invocation are shown below.
 
 To add a bot:
@@ -99,7 +107,18 @@ See recommended setup and configuration [unix script](https://gitlab.com/timjols
     git clone https://gitlab.com/timjolson/halite3-match-manager
     pip3 install -e halite3-match-manager
 
-#### Visualizer (fluorine example)
+### Configure Manager options (saved in database file):
+    # halite executable
+    ./manager.py --halite '../path/to/halite.exe'
+    
+    # replay directory
+    ./manager.py --replay_dir '../path/to/replays'
+    
+    # visualizer command
+    # FILENAME gets replaced at runtime for each usage
+    ./manager.py --visalizer "vis.exe -opt1 FILENAME opt2"
+
+#### Fluorine Visualizer example
     ## Install npm : https://www.npmjs.com/get-npm
     apt install npm
 
@@ -120,15 +139,3 @@ See recommended setup and configuration [unix script](https://gitlab.com/timjols
     
     # Global electron install
     electron ./fluorine -o replay_file.hlt
-
-### Configure Manager options (saved in database file):
-
-    # halite executable
-    ./manager.py --halite '../path/to/halite.exe'
-    
-    # replay directory
-    ./manager.py --replay_dir '../path/to/replays'
-    
-    # visualizer command
-    # FILENAME gets replaced at runtime for each usage
-    ./manager.py --visalizer "vis.exe -opt1 FILENAME opt2"

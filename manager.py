@@ -17,8 +17,8 @@ import sys
 import argparse
 import logging
 
-from halite.manager import Manager, Match, Player, Database
-from halite.utils import MultilineFormatter, KeyStop
+from h3m.manager import Manager, Match, Player, Database
+from h3m.utils import MultilineFormatter, KeyStop
 
 # folders
 managerfolder = os.path.abspath(os.path.dirname(__file__))
