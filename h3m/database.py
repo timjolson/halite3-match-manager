@@ -71,6 +71,16 @@ class Database:
         sql = 'select * from players where name=? '  + ' '.join('or name=?' for _ in names[1:])
         return self.retrieve(sql, names )
 
+    def get_all_players(self):
+        player_records = self.retrieve("select * from players")
+        players = [Player.parse_player_record(player) for player in player_records]
+        return players
+
+    def get_active_players(self):
+        player_records = self.retrieve("select * from players where active > 0")
+        players = [Player.parse_player_record(player) for player in player_records]
+        return players
+
     def get_result( self, game_id):
         sql = 'select * from results where game_id=? '
         return self.retrieve(sql, (game_id,))

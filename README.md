@@ -28,9 +28,9 @@ To add a bot:
 
 To activate/deactivate/delete/play/reset a bot:
 ```
-    ./manager.py -a botname
-    ./manager.py -d botname
-    ./manager.py -D botname
+    ./manager.py -a botname      # activate bot
+    ./manager.py -d botname      # deactivate bot
+    ./manager.py -D botname      # delete bot
     ./manager.py -b botname      # force bot to play
     ./manager.py -rb botname     # reset bot stats
     ./manager.py --activateAll   # activate all bots in database
@@ -50,8 +50,7 @@ To show results:
     
     ./manager.py -R 0       # show last 10 games
     ./manager.py -R 0 -L 5  # show last 5 games
-    ./manager.py -R 10      # show 10 games up to 10th to last played
-    ./manager.py -R 10 -L 5 # show 5 games up to 10th to last played
+    ./manager.py -R 10 -L 5 # show 5 games, starting at 10 games ago
 ```
 
 To visualize match:
@@ -60,41 +59,30 @@ To visualize match:
     ./manager.py -V 0      # play last
     ./manager.py -V -1     # play second to last, etc.
     ./manager.py -m -V 0   # run match and visualize after
-```
 
-To visualize a replay file:
-```
+    # View a replay file by name
     ./manager.py -F /path/to/replay.hlt
 ```
 
-Increase verbosity (manager is nearly silent otherwise):
+Advanced match options:
 ```
-    ./manager.py -v ...
-    ./manager.py -vvv ...
-```
-
-Advanced options:
-```
-    ./manager.py -W NNN  # set map width
-    ./manager.py -H NNN  # set map height
-    ./manager.py -s NNN  # set map seed
     ./manager.py -t NNN  # set turn limit
-    ./manager.py -n      # set no-replays
-    ./manager.py -l      # set no-logs
+    ./manager.py -nr     # set no-replays
+    ./manager.py -nl     # set no-logs
     ./manager.py -nt     # set no-timeout
 
-    -p {N,N,N}  OR  --players {N,N,N}   # player count distribution eg. {2,4}
-    -p N        OR  --players N         # player count is N
+    -p {N,N,N}   # player count distribution eg. {2,4}
+    -p N         # player count is N
     
-    --maps {N,N,N}        # map size distribution eg. {32,40,48,56,64}
-    --maps N              # map size is N
+    -M {N,N,N}   # map size distribution eg. {32,40,48,56,64}
+    -M N         # map size is N
 ```
 
-Advanced data options:
+Advanced database and logging options:
 ```
-    --config # Show configuration settings in database
-    --clear  # Clear *.log and replay files (in ./ and in replay directory set in manager.py)
-    --reset  # Builds fresh database keeping bots and settings
+    --config  # Show configuration settings in database
+    --clear   # Clear *.log and replay files (in ./ and in replay directory set in manager.py)
+    --reset   # Builds fresh database keeping bots and settings
 ```
 
 

@@ -49,7 +49,7 @@ class keyboard_detection:
         # swith to normal terminal
         termios.tcsetattr(self.fd, termios.TCSAFLUSH, self.old_term)
 
-    def query_keyboard(self, keys=list((b'q', b'\x1b'))):
+    def query_keyboard(self, keys=(b'q',)):
         dr, dw, de = select([sys.stdin], [], [], 0)
         key = None
         if dr:

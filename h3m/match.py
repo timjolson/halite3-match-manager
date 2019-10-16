@@ -12,6 +12,7 @@ class Match:
         self.map_height = height
         self.map_width = width
         self.players = players
+        self.num_players = len(players)
         self.paths = [player.path for player in players]
         self.finished = False
         self.stats = None
@@ -24,12 +25,9 @@ class Match:
         self.halite_binary = halite_binary
         self.turn_limit = turn_limit
         self.total_time_limit = 60*5.0  # 5 minutes
-        self.timeouts = []
-        self.num_players = len(players)
-        self.keep_replay = keep_replays
+        self.keep_replays = keep_replays
         self.keep_logs = keep_logs
         self.no_timeout = no_timeout
-        self.parameters = None
         self.logs = None
         self.map_generator = None
 
@@ -47,26 +45,26 @@ class Match:
         result.append("--width " + str(self.map_width))
         result.append('' if not self.turn_limit else ("--turn-limit " + str(self.turn_limit)))
         result.append('--no-logs' if not self.keep_logs else '')
-        result.append('--no-replay' if not self.keep_replay else '')
-        if self.keep_replay or self.keep_logs:
+        result.append('--no-replay' if not self.keep_replays else '')
+        if self.keep_replays or self.keep_logs:
             result.append('--replay-directory ' + str(self.record_dir))
         result.append('--no-timeout' if self.no_timeout else '')
         result.append("--results-as-json")
         result.append("-s " + str(self.map_seed))
 
         cmd = [r for r in result if r] + self.paths
-        self.logger.debug("Command = " + str(' '.join(cmd)))
+        # self.logger.debug("Command = " + str(' '.join(cmd)))
         return cmd
 
     def run_match(self):
         command = self.get_command()
         p = Popen(command, stdin=None, stdout=PIPE, stderr=None)
-        self.logger.debug(f"Command executing for < {self.total_time_limit} seconds...")
+        # self.logger.debug(f"Command executing for < {self.total_time_limit} seconds...")
         results, _ = p.communicate(None, self.total_time_limit)
         self.finished = True
         self.results_string = results.decode('ascii')
         self.return_code = p.returncode
-        self.logger.debug(f"Command returned: {self.return_code}")
+        # self.logger.debug(f"Command returned: {self.return_code}")
         self.parse_results_string()
 
     def parse_results_string(self):
