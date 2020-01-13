@@ -340,7 +340,7 @@ class Commandline:
         # Match handling
         if self.cmds.play_bot:
             self.cmds.force = self.cmds.play_bot
-            player = Player.parse_player_record(self.manager.db.get_player(self.cmds.play_bot)[0])
+            player = Player.parse_player_record(self.manager.db.get_player((self.cmds.play_bot,))[0])
             if player:
                 print(f"Playing '{self.cmds.play_bot}' @'{player.path}'")
             else:
