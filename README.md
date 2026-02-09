@@ -5,6 +5,10 @@ This is a Python package which can run many games between local bots, producing 
 This was adapted from the Halite II match manager. Some bugs and legacy code may remain.
 
 
+Forked from
+https://gitlab.com/smiley1983/halite3-match-manager
+
+
 Usage
 -----
 
