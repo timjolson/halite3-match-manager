@@ -93,7 +93,7 @@ Advanced database and logging options:
 Installation
 -----
 
-See recommended setup and configuration [unix script](https://gitlab.com/timjolson/halite3-match-manager/blob/master/recommended_setup.sh)
+See recommended setup and configuration [unix script](recommended_setup.sh)
 
 #### Manager Package
     git clone https://gitlab.com/timjolson/halite3-match-manager
